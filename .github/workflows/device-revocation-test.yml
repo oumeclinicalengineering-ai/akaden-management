@@ -1,0 +1,56 @@
+name: Free isolated device revocation tests
+on:
+  push:
+    branches: [feature/ver6-qr-enrollment-design]
+    paths:
+      - 'tests/postgres/device_*'
+      - 'supabase/migrations/20261029_device_*_DRAFT.sql'
+      - '.github/workflows/device-revocation-test.yml'
+  pull_request:
+    paths:
+      - 'tests/postgres/device_*'
+      - 'supabase/migrations/20261029_device_*_DRAFT.sql'
+      - '.github/workflows/device-revocation-test.yml'
+permissions:
+  contents: read
+jobs:
+  device-revocation-sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: akaden_device_isolated_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-temporary
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d akaden_device_isolated_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: test-only-temporary
+      PGDATABASE: akaden_device_isolated_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y postgresql-client
+          fi
+      - name: Set up synthetic Auth and RLS
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/fixture.sql
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/device_fixture.sql
+      - name: Apply device allowlist DRAFT
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_device_sessions_DRAFT.sql
+      - name: Apply RLS cutover DRAFT
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_device_cutover_DRAFT.sql
+      - name: Run device revocation assertions
+        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/device_assertions.sql
