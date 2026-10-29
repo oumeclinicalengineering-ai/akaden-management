@@ -30,7 +30,7 @@ VALUES ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',repeat('2',64),
  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
  now()+interval '10 minutes',now());
 
-DO $
+DO $$
 BEGIN
  BEGIN
   PERFORM public.start_device_enrollment(repeat('1',64),repeat('3',64),repeat('4',64));
@@ -42,7 +42,7 @@ BEGIN
   RAISE EXCEPTION 'revoked invite was accepted';
  EXCEPTION WHEN invalid_parameter_value THEN RAISE NOTICE 'PASS: revoked invite denied';
  END;
-END $;
+END $$;
 
 CREATE TEMP TABLE test_request (id uuid PRIMARY KEY); 
 GRANT SELECT ON test_request TO authenticated;
