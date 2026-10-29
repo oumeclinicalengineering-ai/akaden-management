@@ -60,13 +60,13 @@ BEGIN
  END;
 END $$;
 
--- No approval: the browser secret alone cannot redeem a request.
+-- No approval: the request remains unconsumed.
 DO $$
-DECLARE n integer;
 BEGIN
- SELECT count(*) INTO n FROM public.claim_approved_device_enrollment(
-   (SELECT id FROM test_request),repeat('b',64));
- IF n<>0 THEN RAISE EXCEPTION 'unapproved request redeemed'; END IF;
+ IF EXISTS(
+   SELECT 1 FROM app_private.device_enrollment_requests
+   WHERE id=(SELECT id FROM test_request) AND consumed_at IS NOT NULL
+ ) THEN RAISE EXCEPTION 'request consumed before admin approval'; END IF;
 END $$;
 
 -- Staff cannot approve their own enrollment.
@@ -105,18 +105,15 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- Wrong browser secret cannot redeem even after admin approval.
+-- Approval alone must not consume the request; finalizer tests claim it.
 SET request.jwt.claim.role='service_role';
 DO $$
-DECLARE rid uuid := (SELECT id FROM test_request); n integer;
 BEGIN
- SELECT count(*) INTO n FROM public.claim_approved_device_enrollment(rid,repeat('f',64));
- IF n<>0 THEN RAISE EXCEPTION 'wrong browser secret redeemed'; END IF;
- SELECT count(*) INTO n FROM public.claim_approved_device_enrollment(rid,repeat('b',64))
-  WHERE target_user_id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
- IF n<>1 THEN RAISE EXCEPTION 'approved enrollment proof not redeemable'; END IF;
- SELECT count(*) INTO n FROM public.claim_approved_device_enrollment(rid,repeat('b',64));
- IF n<>0 THEN RAISE EXCEPTION 'approved enrollment redeemed twice'; END IF;
+ IF NOT EXISTS(
+  SELECT 1 FROM app_private.device_enrollment_requests
+  WHERE id=(SELECT id FROM test_request) AND approved_at IS NOT NULL
+    AND consumed_at IS NULL
+ ) THEN RAISE EXCEPTION 'approved request consumed too early'; END IF;
 END $$;
 
 -- An incorrect code may be attempted at most 5 times.
@@ -147,14 +144,14 @@ BEGIN
  SELECT count(*) INTO n_req FROM app_private.device_enrollment_audit WHERE event_type='REQUESTED';
  SELECT count(*) INTO n_approve FROM app_private.device_enrollment_audit WHERE event_type='APPROVED';
  SELECT count(*) INTO n_claim FROM app_private.device_enrollment_audit WHERE event_type='CLAIMED';
- IF n_req<>2 OR n_approve<>1 OR n_claim<>1 THEN
+ IF n_req<>2 OR n_approve<>1 OR n_claim<>0 THEN
    RAISE EXCEPTION 'enrollment audit incomplete: %/%/%',n_req,n_approve,n_claim;
  END IF;
  IF has_table_privilege('authenticated','app_private.device_enrollment_requests','SELECT') THEN
    RAISE EXCEPTION 'enrollment requests exposed to authenticated role';
  END IF;
  IF has_function_privilege('authenticated',
-    'public.claim_approved_device_enrollment(uuid,text)','EXECUTE') THEN
+    'public.finalize_approved_device_enrollment(uuid,text,uuid,uuid)','EXECUTE') THEN
    RAISE EXCEPTION 'claim RPC exposed to browser';
  END IF;
 END $$;
