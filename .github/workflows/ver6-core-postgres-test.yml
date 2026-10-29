@@ -3,12 +3,14 @@ on:
   pull_request:
     paths:
       - 'tests/postgres/ver6_core_*.sql'
+      - 'scripts/test-ver6-postgres.py'
       - '.github/workflows/ver6-core-postgres-test.yml'
   push:
     branches:
       - feature/ver6-simple-core-20261029
     paths:
       - 'tests/postgres/ver6_core_*.sql'
+      - 'scripts/test-ver6-postgres.py'
       - '.github/workflows/ver6-core-postgres-test.yml'
 permissions:
   contents: read
@@ -43,3 +45,7 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -f tests/postgres/ver6_core_guard_DRAFT.sql
       - name: Assert quantity guard, roles and triggers
         run: psql -X -v ON_ERROR_STOP=1 -f tests/postgres/ver6_core_assertions.sql
+      - name: Initialize synthetic receipt operations
+        run: psql -X -v ON_ERROR_STOP=1 -f tests/postgres/ver6_core_receipts_fixture.sql
+      - name: Test concurrent quantity changes and receipt audit
+        run: python3 scripts/test-ver6-postgres.py
