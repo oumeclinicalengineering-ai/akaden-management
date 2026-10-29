@@ -9,6 +9,13 @@ BEGIN
  THEN RAISE EXCEPTION 'bootstrapped administrator locked out after cutover'; END IF;
  IF (SELECT count(*) FROM public.orders) <> 1
  THEN RAISE EXCEPTION 'approved admin lost order read'; END IF;
+ -- Cannot revoke the final approved administrator handset.
+ BEGIN
+   PERFORM public.revoke_enrolled_device('aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa');
+   RAISE EXCEPTION 'last admin device was revoked';
+ EXCEPTION WHEN insufficient_privilege THEN
+   RAISE NOTICE 'PASS: last admin device cannot be revoked';
+ END;
 END $$;
 RESET ROLE;
 
