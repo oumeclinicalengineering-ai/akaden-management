@@ -19,11 +19,11 @@ RESET ROLE;
 
 -- Register admin and staff sessions using a trusted server-only operation.
 SET request.jwt.claim.role='service_role';
-SELECT app_private.register_approved_device_session(
+SELECT public.register_approved_device_session(
  'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa',
  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-SELECT app_private.register_approved_device_session(
+SELECT public.register_approved_device_session(
  'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb',
  'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
