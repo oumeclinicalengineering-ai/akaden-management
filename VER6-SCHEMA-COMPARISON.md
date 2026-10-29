@@ -14,6 +14,8 @@
 
 Node動作テスト15件成功・0失敗、静的チェック成功。PostgreSQL境界5項目と既存競合6シナリオはGitHub Actionsの使い捨てPostgreSQL17で実行します。結果は当該コミットのActionsを参照してください。既存の模擬ブラウザー共有試験も維持します。
 
+コードコミット `a17d6c0` の実行結果: PostgreSQLは[PR側40859881685](https://github.com/oumeclinicalengineering-ai/akaden-management/actions/runs/40859881685)・[push側40859875438](https://github.com/oumeclinicalengineering-ai/akaden-management/actions/runs/40859875438)とも成功。静的・Node動作テストも[PR側40859881870](https://github.com/oumeclinicalengineering-ai/akaden-management/actions/runs/40859881870)・[push側40859875478](https://github.com/oumeclinicalengineering-ai/akaden-management/actions/runs/40859875478)とも成功。模擬2ブラウザー共有試験はローカルで成功しました。
+
 ## 未解決・不足情報
 
 要約は完全スキーマではないためreference_no UNIQUE、version、person非空、監査列などを含む本番全体を再現済みとはしません。既存合成SQLの監査は操作種別のみで、actor_id/before_data/after_dataは未検証です。
