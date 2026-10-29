@@ -11,7 +11,7 @@ const REQ='11111111-1111-4111-8111-111111111111';
 const QR='a'.repeat(64);
 const SECRET='b'.repeat(64);
 const TOKEN_HASH='e'.repeat(64);
-const checks=(truth:unknown,what:string):asserts truth=>{
+const checks:(truth:unknown,what:string)=>asserts truth=(truth,what)=>{
  if(!truth)throw new Error(what);
 };
 type MockState={
