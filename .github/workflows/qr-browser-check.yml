@@ -8,6 +8,8 @@ on:
       - 'supabase/functions/ver6-enrollment-api/**'
       - 'supabase/migrations/20261029_finalize_device_enrollment_DRAFT.sql'
       - 'supabase/migrations/20261029_enrollment_admin_views_DRAFT.sql'
+      - 'supabase/migrations/20261029_admin_bootstrap_DRAFT.sql'
+      - 'supabase/migrations/20261029_device_sessions_DRAFT.sql'
       - 'scripts/check-qr-ui.mjs'
       - '.github/workflows/qr-browser-check.yml'
   pull_request:
