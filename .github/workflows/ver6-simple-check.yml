@@ -4,6 +4,7 @@ on:
     paths:
       - 'ver6-simple.html'
       - 'scripts/check-ver6-simple.mjs'
+      - 'scripts/test-ver6-behavior.mjs'
       - '.github/workflows/ver6-simple-check.yml'
   push:
     branches:
@@ -19,3 +20,4 @@ jobs:
         with:
           node-version: '22'
       - run: node scripts/check-ver6-simple.mjs
+      - run: node scripts/test-ver6-behavior.mjs
