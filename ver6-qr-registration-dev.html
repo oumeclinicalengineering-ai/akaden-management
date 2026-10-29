@@ -76,11 +76,20 @@ footer{font-size:.81rem;color:#596979;padding-top:12px}
 <h2><span class="step">STEP 2</span> メールで本人確認</h2>
 <label for="staffEmail">登録済みメールアドレス</label>
 <input type="email" id="staffEmail" placeholder="example@hospital.jp" autocomplete="email">
-<button type="button" id="sendOtp" disabled>認証コードをメール送信</button>
+<label for="authMethod">認証方式（試験用）</label>
+<select id="authMethod">
+<option value="magic">メールのログインリンク（標準）</option>
+<option value="otp">6桁認証コード（専用メール設定時のみ）</option>
+</select>
+<button type="button" id="sendOtp" disabled>ログインリンクをメール送信</button>
+<div id="otpSection" class="hidden">
 <label for="staffOtp">メールで届いた認証コード</label>
 <input id="staffOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6桁のコード">
 <button type="button" id="verifyOtp" disabled>認証コードを確認</button>
-<p class="hint">Supabaseのメールテンプレートは、認証コード用の <code>{{ .Token }}</code> を含む設定が必要です。メールの受信確認ができない場合は登録を進められません。</p>
+</div>
+<button type="button" id="refreshLogin" disabled class="secondary" style="margin-top:12px">ログイン状態を確認</button>
+<p class="hint" id="authHelp">Supabaseの標準メールは送信先と回数に制限があります。Freeプランでの職員全員の実運用には利用できません。実メールは送信せず、最初は模擬テストで確認します。</p>
+<p class="hint">ログインリンクを開く際は、QRを読み取ったブラウザと同じブラウザを使用してください。ログインしたら元のQR画面に戻り、上の「ログイン状態を確認」を押してください。</p>
 </section>
 <section class="card">
 <h2><span class="step">STEP 3</span> 管理者に対面申請</h2>
@@ -177,7 +186,7 @@ const fillSelect=(id,items,toOption)=>{
 };
 const refreshButtons=()=>{
  const online=!!APP.client;
- ['sendOtp','verifyOtp','adminLogin'].forEach(id=>$(id).disabled=!online);
+ ['sendOtp','verifyOtp','adminLogin','refreshLogin'].forEach(id=>$(id).disabled=!online);
  $('prepareBootstrap').disabled=!online || !APP.user;
  $('signout').disabled=!online;
  $('startRequest').disabled=!online || !APP.user || !sessionStorage.getItem('akaden_qr_invite');
@@ -261,10 +270,13 @@ const connect=async()=>{
  }
  APP.base=url;APP.key=key;
  APP.client=window.supabase.createClient(url,key,{
-  auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,
+  auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,
    storageKey:'akaden-ver6-recovery-auth'}
  });
- // Keep the same public connection settings and Auth storage as the Ver.6 preview.\n localStorage.setItem('akaden-ver6-public-config',JSON.stringify({url,key}));\n // QR tokens and browser proofs are never saved to localStorage.
+ // Save only the PUBLIC project URL and publishable key so a Magic Link callback
+ // can initialize the SDK in a new tab using the same browser/origin.
+ localStorage.setItem('akaden-ver6-public-config',JSON.stringify({url,key}));
+ // QR tokens and browser proofs are NEVER saved to localStorage.
  await refreshIdentity();
  note('接続しました。登録APIは本番未配備のため、QR登録の実操作はできません。','success');
 };
@@ -318,11 +330,24 @@ const issueQr=async()=>{
 const sendOtp=async()=>{
  const email=$('staffEmail').value.trim();
  if(!email)throw new Error('メールアドレスを入力してください');
- const {error}=await APP.client.auth.signInWithOtp({
-  email,options:{shouldCreateUser:false}
- });
+ const method=$('authMethod').value;
+ const options={shouldCreateUser:false};
+ // Magic Link returns to this page. Before real testing, the exact HTTPS URL
+ // must be allowlisted in Supabase Auth URL Configuration.
+ if(method==='magic')options.emailRedirectTo=location.origin+location.pathname;
+ const {error}=await APP.client.auth.signInWithOtp({email,options});
  if(error)throw error;
- note('認証用メールを送信しました。届いた6桁のコードを入力してください。','success');
+ note(method==='magic'
+   ?'ログインリンクの送信処理が受け付けられました。同じブラウザでメールのリンクを開き、元のQR画面に戻ってください。'
+   :'認証コードを送信しました。メールで届いた6桁のコードを入力してください。','success');
+};
+const updateAuthMethod=()=>{
+ const otp=$('authMethod').value==='otp';
+ show('otpSection',otp);
+ $('sendOtp').textContent=otp?'6桁認証コードをメール送信':'ログインリンクをメール送信';
+ $('authHelp').textContent=otp
+  ?'6桁認証コードはMagic Linkメールテンプレートに {{ .Token }} を設定できる環境でのみ利用できます。2026年6月以降の新規Freeプロジェクトでは標準SMTPのテンプレートを変更できません。'
+  :'Supabase標準メールは原則プロジェクトのチームメンバー宛てだけで、現在2通/時の制限があります。職員全員の実運用には別の送信手段か認証方式が必要です。';
 };
 const verifyOtp=async()=>{
  const email=$('staffEmail').value.trim();
@@ -402,13 +427,26 @@ bind('signout',async()=>{if(APP.client)await APP.client.auth.signOut({scope:'loc
  APP.user=null;await refreshIdentity();note('この端末からログアウトしました。','success')});
 bind('adminLogin',adminLogin);bind('prepareBootstrap',showBootstrapIds);bind('issueQr',issueQr);
 bind('sendOtp',sendOtp);bind('verifyOtp',verifyOtp);
+bind('refreshLogin',async()=>{await refreshIdentity();
+ note(APP.user?'ログインを確認しました。QR登録申請を進めてください。':'まだログインしていません。','info');});
+$('authMethod').addEventListener('change',updateAuthMethod);
 bind('startRequest',startRequest);bind('finishRequest',finishRequest);
 bind('refreshPending',pending);bind('approveRequest',approve);
 bind('refreshDevices',devices);bind('revokeDevice',revoke);
 $('adminTab').addEventListener('click',()=>setTab('admin'));
 $('staffTab').addEventListener('click',()=>setTab('staff'));
 renderInvite();
+updateAuthMethod();
 refreshButtons();
+try{
+ const cfg=JSON.parse(localStorage.getItem('akaden-ver6-public-config')||'null');
+ if(cfg?.url && cfg?.key && typeof cfg.url==='string' && typeof cfg.key==='string'){
+  $('projectUrl').value=cfg.url;
+  $('publicKey').value=cfg.key;
+  // Auto-connect only with a previously saved public config. No OTP is sent.
+  safe(connect);
+ }
+}catch{ /* An invalid old public config is ignored. */ }
 })();
 </script>
 </body>
