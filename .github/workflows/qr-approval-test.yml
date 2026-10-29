@@ -4,13 +4,15 @@ on:
     branches: [feature/ver6-qr-enrollment-design]
     paths:
       - 'tests/postgres/qr_*'
+      - 'tests/postgres/device_fixture.sql'
       - 'supabase/migrations/20261029_device_enrollment_approval_DRAFT.sql'
       - 'supabase/migrations/20261029_finalize_device_enrollment_DRAFT.sql'
       - 'supabase/migrations/20261029_enrollment_admin_views_DRAFT.sql'
       - '.github/workflows/qr-approval-test.yml'
   pull_request:
     paths:
-      - 'tests/postgres/qr_approval_*'
+      - 'tests/postgres/qr_*'
+      - 'tests/postgres/device_fixture.sql'
       - 'supabase/migrations/20261029_device_enrollment_approval_DRAFT.sql'
       - '.github/workflows/qr-approval-test.yml'
 permissions:
