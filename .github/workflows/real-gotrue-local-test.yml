@@ -89,6 +89,31 @@ jobs:
           )"
           test "$count" = "1"
           echo 'PASS: Real GoTrue auth.sessions row belongs to the verified user.'
+      - name: Bind verified real Auth session to staged QR enrollment RPCs
+        run: |
+          set -eu
+          case "$LOCAL_DB_URL" in
+            postgresql://*@127.0.0.1:54322/*|postgres://*@127.0.0.1:54322/*) ;;
+            *) echo 'REFUSED: non-local database'; exit 1 ;;
+          esac
+          ids="$RUNNER_TEMP/akaden-real-auth-ids.txt"
+          uid="$(sed -n '1p' "$ids")"
+          sid="$(sed -n '2p' "$ids")"
+          printf '%s' "$uid" | grep -Eq '^[0-9a-f-]{36}
+        if: always()
+        run: |
+          npx --yes supabase@2.122.0 --workdir "$RUNNER_TEMP/akaden-ver6-real-auth" stop --no-backup || true
+          rm -f "$RUNNER_TEMP/akaden-real-auth-ids.txt"
+
+          printf '%s' "$sid" | grep -Eq '^[0-9a-f-]{36}
+        if: always()
+        run: |
+          npx --yes supabase@2.122.0 --workdir "$RUNNER_TEMP/akaden-ver6-real-auth" stop --no-backup || true
+          rm -f "$RUNNER_TEMP/akaden-real-auth-ids.txt"
+
+          psql "$LOCAL_DB_URL" -X -v ON_ERROR_STOP=1 \
+            -v staff_uid="$uid" -v session_id="$sid" \
+            -f tests/auth/local-qr-real-session.test.sql
       - name: Destroy disposable stack, even after failure
         if: always()
         run: |
