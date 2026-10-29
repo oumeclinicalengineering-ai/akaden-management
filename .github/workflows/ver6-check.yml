@@ -1,0 +1,25 @@
+name: Ver6 recovery static checks
+on:
+  pull_request:
+    paths:
+      - 'ver6-recovery.html'
+      - 'scripts/check-ver6.mjs'
+      - '.github/workflows/ver6-check.yml'
+  push:
+    branches:
+      - feature/ver6-supabase-recovery
+    paths:
+      - 'ver6-recovery.html'
+      - 'scripts/check-ver6.mjs'
+      - '.github/workflows/ver6-check.yml'
+permissions:
+  contents: read
+jobs:
+  static-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/check-ver6.mjs
