@@ -1,0 +1,58 @@
+name: Free isolated QR approval tests
+on:
+  push:
+    branches: [feature/ver6-qr-enrollment-design]
+    paths:
+      - 'tests/postgres/qr_approval_*'
+      - 'supabase/migrations/20261029_device_enrollment_approval_DRAFT.sql'
+      - '.github/workflows/qr-approval-test.yml'
+  pull_request:
+    paths:
+      - 'tests/postgres/qr_approval_*'
+      - 'supabase/migrations/20261029_device_enrollment_approval_DRAFT.sql'
+      - '.github/workflows/qr-approval-test.yml'
+permissions:
+  contents: read
+jobs:
+  qr-request-approval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: akaden_qr_isolated_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-temporary
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d akaden_qr_isolated_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: test-only-temporary
+      PGDATABASE: akaden_qr_isolated_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y postgresql-client
+          fi
+      - name: Create fake-only PostgreSQL and simulated Auth
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/fixture.sql
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/device_fixture.sql
+      - name: Apply DRAFT migrations to temporary database
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_device_enrollment_invites_DRAFT.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_device_sessions_DRAFT.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_device_cutover_DRAFT.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_device_enrollment_approval_DRAFT.sql
+      - name: Verify QR enrollment state transitions and permissions
+        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/qr_approval_assertions.sql
