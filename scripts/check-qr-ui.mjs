@@ -71,4 +71,11 @@ assert.ok(recovery.includes("revocation_source='SQL_EDITOR_RECOVERY'"),
  'Recovery-induced revocation must be auditable');
 assert.ok(sessions.includes('JOIN auth.sessions auth_s'),
  'Approved sessions must also exist in live Supabase Auth');
+// Guard against malformed single-dollar PL/pgSQL delimiters in fixtures.
+for (const filename of fs.readdirSync(new URL('../tests/postgres/',import.meta.url))) {
+ if(!filename.endsWith('.sql'))continue;
+ const sql=read('tests/postgres/'+filename);
+ assert.ok(!/^\s*(?:DO \$|END \$;)\s*$/m.test(sql),
+   'Malformed PL/pgSQL delimiter in '+filename);
+}
 console.log('PASS: UI/OTP, operator-only recovery, live Auth session deny, QR and bootstrap gates');
