@@ -8,6 +8,7 @@ const api=read('supabase/functions/ver6-enrollment-api/index.ts');
 const finalize=read('supabase/migrations/20261029_finalize_device_enrollment_DRAFT.sql');
 const adminView=read('supabase/migrations/20261029_enrollment_admin_views_DRAFT.sql');
 const bootstrap=read('supabase/migrations/20261029_admin_bootstrap_DRAFT.sql');
+const recovery=read('supabase/migrations/20261029_admin_device_recovery_DRAFT.sql');
 const sessions=read('supabase/migrations/20261029_device_sessions_DRAFT.sql');
 
 const scripts=[...page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
@@ -53,4 +54,21 @@ assert.ok(bootstrap.includes('FROM PUBLIC,anon,authenticated,service_role'),
   'bootstrap executable must be denied to all public API roles');
 assert.ok(sessions.includes('最後の有効な管理者端末は無効化できません'),
   'revocation must preserve the last approved admin device');
-console.log('PASS: HTML syntax, passwordless OTP, QR secret handling, API gates, admin bootstrap and session binding');
+const showStart=page.indexOf('const showBootstrapIds=async()=>{');
+const showEnd=page.indexOf('const loadStaff=async()=>{',showStart);
+assert.ok(showStart>0 && showEnd>showStart,
+ 'Bootstrap/recovery ID display handler missing');
+const showHandler=page.slice(showStart,showEnd);
+assert.ok(showHandler.includes('auth.getUser(token)'),
+ 'Recovery ID display must use official authenticated Auth user');
+assert.ok(!showHandler.includes(".from('profiles')"),
+ 'Unapproved replacement device cannot rely on profiles RLS to show session IDs');
+assert.ok(recovery.includes('FROM PUBLIC,anon,authenticated,service_role'),
+ 'Emergency recovery must be denied to public and service-role API callers');
+assert.ok(recovery.includes('JOIN public.profiles p ON p.user_id=s.user_id'),
+ 'Emergency recovery must check existing active admin profile');
+assert.ok(recovery.includes("revocation_source='SQL_EDITOR_RECOVERY'"),
+ 'Recovery-induced revocation must be auditable');
+assert.ok(sessions.includes('JOIN auth.sessions auth_s'),
+ 'Approved sessions must also exist in live Supabase Auth');
+console.log('PASS: UI/OTP, operator-only recovery, live Auth session deny, QR and bootstrap gates');
