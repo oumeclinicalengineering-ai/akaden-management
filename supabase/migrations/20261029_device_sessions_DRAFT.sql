@@ -113,7 +113,9 @@ BEGIN
   ) AND NOT EXISTS (
     SELECT 1 FROM app_private.approved_device_sessions s
       JOIN public.profiles p ON p.user_id = s.user_id
+      JOIN auth.sessions a ON a.id=s.session_id AND a.user_id=s.user_id
     WHERE s.session_id <> p_session_id AND s.revoked_at IS NULL
+      AND (a.not_after IS NULL OR a.not_after > now())
       AND p.active AND p.role = 'admin'
   ) THEN
     RAISE EXCEPTION '最後の有効な管理者端末は無効化できません'
