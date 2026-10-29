@@ -109,6 +109,17 @@ footer{font-size:.81rem;color:#596979;padding-top:12px}
 <button type="button" id="adminLogin" disabled>管理者ログイン</button>
 <p class="hint">このパスワードは保存しません。QR登録前に管理者端末の初期承認が必要です。</p>
 </section>
+<section class="card" id="adminBootstrapCard">
+<h2>初回管理者端末の準備（管理者専用）</h2>
+<p>既存の管理者でログインすると、この端末の<strong>管理者ID・セッションID</strong>を確認できます。これらは認証用のパスワードやJWTではありません。</p>
+<p class="hint">初回登録はSupabase SQL Editorを操作できる管理者が対面確認し、専用SQLで1回だけ行う設計です。<strong>この画面では承認・DB更新を行いません。</strong></p>
+<button type="button" id="prepareBootstrap" disabled class="secondary">初回承認に必要なIDを確認</button>
+<div id="bootstrapDetails" class="hidden">
+<label>管理者ユーザーID</label><p id="bootstrapUserId" class="hint" style="overflow-wrap:anywhere">—</p>
+<label>現在のログインセッションID</label><p id="bootstrapSessionId" class="hint" style="overflow-wrap:anywhere">—</p>
+<p class="hint">この2つのIDはSupabaseの管理画面だけで照合してください。アクセストークン・リフレッシュトークンやパスワードは共有しないでください。</p>
+</div>
+</section>
 <section class="card">
 <h2><span class="step">STEP 2</span> スタッフ用QR発行</h2>
 <label for="staffChoice">登録対象スタッフ</label>
@@ -167,6 +178,7 @@ const fillSelect=(id,items,toOption)=>{
 const refreshButtons=()=>{
  const online=!!APP.client;
  ['sendOtp','verifyOtp','adminLogin'].forEach(id=>$(id).disabled=!online);
+ $('prepareBootstrap').disabled=!online || !APP.user;
  $('signout').disabled=!online;
  $('startRequest').disabled=!online || !APP.user || !sessionStorage.getItem('akaden_qr_invite');
  $('finishRequest').disabled=!online || !APP.user || !getProof().request_id;
@@ -264,8 +276,25 @@ const adminLogin=async()=>{
  $('adminPassword').value='';
  if(error)throw error;
  await refreshIdentity();
- await loadStaff();
- note('管理者ログインできました。QR発行APIは未配備です。','success');
+ try{await loadStaff()}catch{ /* Bootstrap may precede RLS cutover; do not treat it as failed login. */ }
+ note('管理者としてログインしました。最初に「初回承認に必要なIDを確認」を押してください。','success');
+};
+const showBootstrapIds=async()=>{
+ const token=await requireAuth();
+ const {data,error}=await APP.client.auth.getUser(token);
+ const claims=decodeJwt(token);
+ const user=data?.user;
+ if(error || !user || claims?.sub!==user.id || typeof claims?.session_id!=='string'
+   || !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(claims.session_id))
+   throw new Error('このログインのユーザーIDとセッションIDを検証できません');
+ const {data:profile,error:profileError}=await APP.client.from('profiles')
+   .select('role,active').eq('user_id',user.id).maybeSingle();
+ if(profileError || profile?.role!=='admin' || profile.active!==true)
+   throw new Error('有効な管理者アカウントでログインしてください');
+ $('bootstrapUserId').textContent=user.id;
+ $('bootstrapSessionId').textContent=claims.session_id;
+ show('bootstrapDetails',true);
+ note('現在の管理者セッションを確認しました。初回承認SQLはまだ実行されていません。','success');
 };
 const loadStaff=async()=>{
  const {data,error}=await APP.client.from('profiles')
@@ -372,7 +401,7 @@ const bind=(id,fn)=>$(id).addEventListener('click',()=>safe(fn));
 bind('connect',connect);
 bind('signout',async()=>{if(APP.client)await APP.client.auth.signOut({scope:'local'});
  APP.user=null;await refreshIdentity();note('この端末からログアウトしました。','success')});
-bind('adminLogin',adminLogin);bind('issueQr',issueQr);
+bind('adminLogin',adminLogin);bind('prepareBootstrap',showBootstrapIds);bind('issueQr',issueQr);
 bind('sendOtp',sendOtp);bind('verifyOtp',verifyOtp);
 bind('startRequest',startRequest);bind('finishRequest',finishRequest);
 bind('refreshPending',pending);bind('approveRequest',approve);
