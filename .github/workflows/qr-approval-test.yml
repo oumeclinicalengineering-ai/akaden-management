@@ -9,6 +9,7 @@ on:
       - 'supabase/migrations/20261029_finalize_device_enrollment_DRAFT.sql'
       - 'supabase/migrations/20261029_enrollment_admin_views_DRAFT.sql'
       - 'supabase/migrations/20261029_face_to_face_auth_claim_DRAFT.sql'
+      - 'supabase/migrations/20261029_qr_abuse_rate_budgets_DRAFT.sql'
       - '.github/workflows/qr-approval-test.yml'
   pull_request:
     paths:
@@ -62,8 +63,10 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_finalize_device_enrollment_DRAFT.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_enrollment_admin_views_DRAFT.sql
           psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_face_to_face_auth_claim_DRAFT.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_qr_abuse_rate_budgets_DRAFT.sql
       - name: Verify QR enrollment state transitions and permissions
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/postgres/qr_approval_assertions.sql
           psql -v ON_ERROR_STOP=1 -f tests/postgres/qr_finalize_assertions.sql
           psql -v ON_ERROR_STOP=1 -f tests/postgres/qr_face_to_face_assertions.sql
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/qr_rate_budget_assertions.sql
