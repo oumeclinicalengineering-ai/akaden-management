@@ -17,6 +17,33 @@ VALUES
  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',repeat('d',64),
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',now()+interval '10 minutes');
 
+
+-- Expired and manually revoked QR invitations must never start enrollment.
+INSERT INTO public.device_enrollment_invites
+ (user_id,token_hash,issued_by,created_at,expires_at)
+VALUES ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',repeat('1',64),
+ 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+ now()-interval '30 minutes',now()-interval '20 minutes');
+INSERT INTO public.device_enrollment_invites
+ (user_id,token_hash,issued_by,expires_at,revoked_at)
+VALUES ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',repeat('2',64),
+ 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+ now()+interval '10 minutes',now());
+
+DO $
+BEGIN
+ BEGIN
+  PERFORM public.start_device_enrollment(repeat('1',64),repeat('3',64),repeat('4',64));
+  RAISE EXCEPTION 'expired invite was accepted';
+ EXCEPTION WHEN invalid_parameter_value THEN RAISE NOTICE 'PASS: expired invite denied';
+ END;
+ BEGIN
+  PERFORM public.start_device_enrollment(repeat('2',64),repeat('3',64),repeat('4',64));
+  RAISE EXCEPTION 'revoked invite was accepted';
+ EXCEPTION WHEN invalid_parameter_value THEN RAISE NOTICE 'PASS: revoked invite denied';
+ END;
+END $;
+
 CREATE TEMP TABLE test_request (id uuid PRIMARY KEY); 
 GRANT SELECT ON test_request TO authenticated;
 INSERT INTO test_request
