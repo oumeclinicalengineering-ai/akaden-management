@@ -32,3 +32,13 @@ INSERT INTO auth.users(id) VALUES
 INSERT INTO public.profiles(user_id,role,active) VALUES
 ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','admin',true),
 ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','staff',true);
+-- Simulated GoTrue sessions for all Postgres RLS test suites.
+CREATE TABLE auth.sessions (
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES auth.users(id),
+  not_after timestamptz
+);
+INSERT INTO auth.sessions(id,user_id,not_after) VALUES
+('aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',NULL),
+('bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',NULL);
+
