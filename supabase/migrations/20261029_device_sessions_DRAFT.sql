@@ -1,5 +1,7 @@
 -- STAGING DRAFT ONLY: NOT APPLIED TO LIVE SUPABASE.
 -- Session allowlist for approved devices. Auth access tokens carry session_id.
+-- Verify auth.sessions presence too: an Auth sign-out/session deletion must
+-- immediately deny DB access even if a previously signed JWT has not expired.
 -- This migration alone does NOT enforce access restrictions; the separate
 -- DEVICE_CUTOVER draft must be applied after admin session bootstrap.
 -- No browser secret or service_role credentials belong in public source.
@@ -44,9 +46,12 @@ SET search_path = ''
 AS $body$
   SELECT EXISTS(
     SELECT 1 FROM app_private.approved_device_sessions s
+    JOIN auth.sessions auth_s
+      ON auth_s.id = s.session_id AND auth_s.user_id = s.user_id
     WHERE s.user_id = (SELECT auth.uid())
       AND s.session_id::text = (SELECT auth.jwt() ->> 'session_id')
       AND s.revoked_at IS NULL
+      AND (auth_s.not_after IS NULL OR auth_s.not_after > now())
   );
 $body$;
 REVOKE ALL ON FUNCTION app_private.has_approved_device_session() FROM PUBLIC, anon;
