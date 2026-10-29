@@ -250,9 +250,9 @@ const connect=async()=>{
  APP.base=url;APP.key=key;
  APP.client=window.supabase.createClient(url,key,{
   auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,
-   storageKey:'akaden-qr-registration-auth'}
+   storageKey:'akaden-ver6-recovery-auth'}
  });
- // No public key or private token is written to localStorage by our code.
+ // Keep the same public connection settings and Auth storage as the Ver.6 preview.\n localStorage.setItem('akaden-ver6-public-config',JSON.stringify({url,key}));\n // QR tokens and browser proofs are never saved to localStorage.
  await refreshIdentity();
  note('接続しました。登録APIは本番未配備のため、QR登録の実操作はできません。','success');
 };
