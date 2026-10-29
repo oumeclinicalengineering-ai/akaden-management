@@ -45,8 +45,9 @@ Deno.test('Real local GoTrue magiclink -> session -> RLS; replay denied', async 
   const jwtPart = session.access_token.split('.')[1];
   check(Boolean(jwtPart), 'Access token has no JWT payload');
   // Claims provide test evidence only. Never authorize by locally parsing JWT.
-  const claims = JSON.parse(atob(jwtPart.replace(/-/g, '+').replace(/_/g, '/')))
-    as { sub?: string; role?: string; session_id?: string };
+  const claims: { sub?: string; role?: string; session_id?: string } = JSON.parse(
+    atob(jwtPart.replace(/-/g, '+').replace(/_/g, '/'))
+  );
   check(claims.sub === staffId && claims.role === 'authenticated', 'JWT identity/role mismatch');
   check(typeof claims.session_id === 'string' && uuid.test(claims.session_id),
     'Real GoTrue JWT missing valid session_id');
