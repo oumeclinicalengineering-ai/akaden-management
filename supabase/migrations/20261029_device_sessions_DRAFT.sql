@@ -52,12 +52,12 @@ $body$;
 REVOKE ALL ON FUNCTION app_private.has_approved_device_session() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION app_private.has_approved_device_session() TO authenticated;
 
--- Enrollment is intentionally SERVICE-ONLY. The Edge Function must check:
+-- Enrollment is intentionally SERVICE-ONLY and the narrow RPC is in public\n-- because app_private is not an exposed PostgREST schema. The Edge Function must check:
 -- 1) current admin's Supabase Auth identity and authorization,
 -- 2) staff's face-to-face registration request / challenge and expiration,
 -- 3) verified target's *actual* Supabase Auth session_id,
 -- BEFORE calling this function. Do not call for an arbitrary supplied UUID.
-CREATE OR REPLACE FUNCTION app_private.register_approved_device_session(
+CREATE OR REPLACE FUNCTION public.register_approved_device_session(
   p_session_id uuid, p_user_id uuid, p_approver uuid
 ) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
@@ -77,9 +77,9 @@ BEGIN
   VALUES('DEVICE_ENROLLED',p_user_id,p_session_id,p_approver);
 END;
 $body$;
-REVOKE ALL ON FUNCTION app_private.register_approved_device_session(uuid,uuid,uuid)
+REVOKE ALL ON FUNCTION public.register_approved_device_session(uuid,uuid,uuid)
   FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION app_private.register_approved_device_session(uuid,uuid,uuid)
+GRANT EXECUTE ON FUNCTION public.register_approved_device_session(uuid,uuid,uuid)
   TO service_role;
 
 -- Admin-initiated revocation. This function will be callable from a signed-in
