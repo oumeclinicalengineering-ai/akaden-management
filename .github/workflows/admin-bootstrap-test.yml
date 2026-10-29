@@ -1,0 +1,67 @@
+name: Free isolated first-admin bootstrap tests
+on:
+  push:
+    branches: [feature/ver6-qr-enrollment-design]
+    paths:
+      - 'supabase/migrations/20261029_admin_bootstrap_DRAFT.sql'
+      - 'supabase/migrations/20261029_device_sessions_DRAFT.sql'
+      - 'supabase/migrations/20261029_device_cutover_DRAFT.sql'
+      - 'tests/postgres/bootstrap_*'
+      - 'tests/postgres/device_fixture.sql'
+      - '.github/workflows/admin-bootstrap-test.yml'
+  pull_request:
+    paths:
+      - 'supabase/migrations/20261029_admin_bootstrap_DRAFT.sql'
+      - 'supabase/migrations/20261029_device_sessions_DRAFT.sql'
+      - 'supabase/migrations/20261029_device_cutover_DRAFT.sql'
+      - 'tests/postgres/bootstrap_*'
+      - 'tests/postgres/device_fixture.sql'
+      - '.github/workflows/admin-bootstrap-test.yml'
+permissions:
+  contents: read
+jobs:
+  first-admin-bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: akaden_bootstrap_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-temporary
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d akaden_bootstrap_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: test-only-temporary
+      PGDATABASE: akaden_bootstrap_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y postgresql-client
+          fi
+      - name: Prepare fake-only Auth and tables
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/fixture.sql
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/device_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/bootstrap_fixture.sql
+      - name: Install draft device sessions and one-time bootstrap
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_device_sessions_DRAFT.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_admin_bootstrap_DRAFT.sql
+      - name: Verify operator-only initial admin enrollment
+        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/bootstrap_pre_cutover.sql
+      - name: Test RLS cutover AFTER operator bootstrap
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_device_cutover_DRAFT.sql
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/bootstrap_post_cutover.sql
