@@ -44,3 +44,23 @@ test('zero-row cancellation is reported as failure',async()=>{
 test('allow contract maximum quantity',async()=>{
  const s=setup(100000000);await s.element('ordersRows').onclick({target:{dataset:{editOrder:'demo'}}});assert.equal(s.writes[0].quantity,100000000);
 });
+function receiptSetup(quantity=2){
+ const s=setup();const calls=[];
+ s.context.FormData=class {constructor(){this.values=new Map(Object.entries({p_quantity:String(quantity),p_receipt_date:'2026-10-29',p_person:' 架空スタッフ ',p_memo:'架空メモ'}))}get(k){return this.values.get(k)}};
+ s.context.mock.rpc=async(name,args)=>{calls.push({name,args});return {data:'fictional-receipt',error:null}};
+ vm.runInContext("selected=orders[0];openOrder=()=>{}",s.context);
+ return {...s,calls,event:{preventDefault(){},target:{elements:{p_quantity:{value:''}}}}};
+}
+test('receipt submission matches documented add_receipt argument contract',async()=>{
+ const s=receiptSetup();await s.element('newReceipt').onsubmit(s.event);
+ assert.equal(s.calls.length,1);assert.equal(s.calls[0].name,'add_receipt');
+ assert.deepEqual(JSON.parse(JSON.stringify(s.calls[0].args)),{p_order_id:'demo',p_quantity:2,p_receipt_date:'2026-10-29',p_person:'架空スタッフ',p_memo:'架空メモ'});
+ assert.match(s.element('status').textContent,/受領登録しました/);
+});
+test('fractional receipt rejected before RPC call',async()=>{
+ const s=receiptSetup(1.5);await s.element('newReceipt').onsubmit(s.event);assert.equal(s.calls.length,0);
+});
+test('RPC permission error is visible and does not report receipt success',async()=>{
+ const s=receiptSetup();s.context.mock.rpc=async()=>({error:{code:'42501',message:'mock permission denied'}});
+ await s.element('newReceipt').onsubmit(s.event);assert.match(s.element('status').textContent,/受領登録できません/);
+});
