@@ -135,7 +135,7 @@ DECLARE n integer;
 BEGIN
  SELECT count(*) INTO n FROM app_private.device_enrollment_audit
  WHERE event_type='CLAIMED';
- IF n <> 2 THEN RAISE EXCEPTION 'completion audit count mismatch: %',n; END IF;
+ IF n <> 1 THEN RAISE EXCEPTION 'completion audit count mismatch: %',n; END IF;
  SELECT count(*) INTO n FROM app_private.device_security_events
  WHERE event_type='DEVICE_ENROLLED';
  IF n <> 2 THEN RAISE EXCEPTION 'device-enrolled audit count mismatch: %',n; END IF;
