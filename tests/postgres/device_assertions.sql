@@ -62,6 +62,34 @@ BEGIN
 END $$;
 RESET ROLE;
 
+-- Even if the signed access JWT has not expired, an expired or REMOVED
+-- GoTrue Auth session must fail the DB-side allowlist check.
+UPDATE auth.sessions SET not_after=now()-interval '1 minute'
+ WHERE id='bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+SET ROLE authenticated;
+DO $
+BEGIN
+ IF public.is_active_user() OR (SELECT count(*) FROM public.orders)<>0 THEN
+   RAISE EXCEPTION 'expired GoTrue session retained DB access';
+ END IF;
+END $;
+RESET ROLE;
+UPDATE auth.sessions SET not_after=NULL
+ WHERE id='bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+DELETE FROM auth.sessions
+ WHERE id='bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+SET ROLE authenticated;
+DO $
+BEGIN
+ IF public.is_active_user() OR (SELECT count(*) FROM public.orders)<>0 THEN
+  RAISE EXCEPTION 'signed-out GoTrue session retained DB access';
+ END IF;
+END $;
+RESET ROLE;
+INSERT INTO auth.sessions(id,user_id)
+ VALUES('bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb',
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+
 -- A valid JWT for a DIFFERENT session of the same user is denied.
 SET request.jwt.claims='{"session_id":"bbbbbbbb-3333-4333-8333-bbbbbbbbbbbb"}';
 SET ROLE authenticated;
