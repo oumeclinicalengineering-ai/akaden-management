@@ -1,6 +1,15 @@
--- Tests run ONLY in temporary PostgreSQL. Prior script creates face_request.
+-- Tests run ONLY in temporary PostgreSQL. Prior script creates rate_request.
 -- Counters are persistent per operation and per REAL reference. No raw QR stored.
 SET request.jwt.claim.role='service_role';
+-- Each psql -f runs in its own connection: create local fake references here.
+INSERT INTO public.device_enrollment_invites
+  (user_id,token_hash,issued_by,expires_at)
+VALUES ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',repeat('3',64),
+ 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',now()+interval '10 minutes');
+CREATE TEMP TABLE rate_request(id uuid PRIMARY KEY);
+INSERT INTO rate_request
+SELECT public.start_device_enrollment(repeat('3',64),repeat('4',64),repeat('5',64));
+
 
 DO $body$
 DECLARE n integer;
@@ -37,18 +46,18 @@ BEGIN
 
   FOR n IN 1..6 LOOP
     IF NOT public.consume_qr_enrollment_rate_budget(
-       'redeem',(SELECT id::text FROM face_request))
+       'redeem',(SELECT id::text FROM rate_request))
     THEN RAISE EXCEPTION 'Redeem rate budget rejected within allowance'; END IF;
   END LOOP;
   IF public.consume_qr_enrollment_rate_budget(
-      'redeem',(SELECT id::text FROM face_request))
+      'redeem',(SELECT id::text FROM rate_request))
   THEN RAISE EXCEPTION '7th redeem attempt bypassed per-request rate limit'; END IF;
 
   UPDATE app_private.qr_enrollment_rate_budgets
     SET window_started_at=now()-interval '11 minutes'
-  WHERE action='redeem' AND scope=(SELECT id::text FROM face_request);
+  WHERE action='redeem' AND scope=(SELECT id::text FROM rate_request);
   IF NOT public.consume_qr_enrollment_rate_budget(
-      'redeem',(SELECT id::text FROM face_request))
+      'redeem',(SELECT id::text FROM rate_request))
   THEN RAISE EXCEPTION 'Redeem rate budget did not reset'; END IF;
 
   -- Exhaust the GLOBAL start budget, then confirm it resets automatically.
@@ -68,7 +77,7 @@ BEGIN
     SET request_count=90,window_started_at=now()
   WHERE action='redeem' AND scope='global';
   IF public.consume_qr_enrollment_rate_budget(
-    'redeem',(SELECT id::text FROM face_request))
+    'redeem',(SELECT id::text FROM rate_request))
   THEN RAISE EXCEPTION 'global redeem cap was bypassed'; END IF;
 
   -- Private rate counters are not exposed to browsers.
