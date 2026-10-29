@@ -144,12 +144,13 @@ export const handleFaceToFaceRequest=async (
       const {data:link,error:linkError}=await client.auth.admin.generateLink({
         type:'magiclink',email:user.email
       });
+      const hashedToken=link?.properties?.hashed_token;
       if(linkError || link?.user?.id!==targetId ||
-          !hex64.test(String(link?.properties?.hashed_token??'')))
+          !hashedToken || !hex64.test(hashedToken))
         return reply(503,{error:'Could not issue an Auth proof; ask for new QR'});
       // This is an actual LOGIN CREDENTIAL. Return it once, ONLY to browser
       // holding request_id + private 256-bit secret AFTER admin approval.
-      return reply(200,{token_hash:link.properties.hashed_token,type:'magiclink'});
+      return reply(200,{token_hash:hashedToken,type:'magiclink'});
     }
     return reply(400,{error:'Unknown action'});
   }catch{
