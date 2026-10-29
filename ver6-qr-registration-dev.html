@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Cache-Control" content="no-store">
-<title>赤伝Ver.6｜QR対面登録 開発版</title>
+<title>赤伝Ver.6｜QR対面登録 開発版（メール不要）</title>
 <script>
 /* Capture QR fragment before external SDK loads; fragments never reach HTTP server. */
 (function(){
@@ -51,7 +51,7 @@ footer{font-size:.81rem;color:#596979;padding-top:12px}
 <header><h1>赤伝管理システム Ver.6｜QR対面登録</h1></header>
 <main>
 <div class="warn"><strong>開発版：本番利用不可</strong>
-<p class="small">GitHubの開発ブランチにある試作品です。QR登録用サーバーは未配備で、登録操作はまだ利用できません。架空のスタッフだけで試験し、患者情報や秘密鍵は入力しないでください。</p></div>
+<p class="small">GitHubの開発ブランチにある試作品です。メール不要の対面登録を設計していますが、QR登録用サーバーは未配備です。本番利用できません。架空のスタッフだけで試験してください。</p></div>
 <section class="card">
 <h2>接続設定（試験専用）</h2>
 <label for="projectUrl">Supabase Project URL</label>
@@ -73,7 +73,12 @@ footer{font-size:.81rem;color:#596979;padding-top:12px}
 <p class="hint">QRは登録先の案内だけです。読み取っただけではログインできません。</p>
 </section>
 <section class="card">
-<h2><span class="step">STEP 2</span> メールで本人確認</h2>
+<h2><span class="step">STEP 2</span> 管理者の前で申請（メール不要）</h2>
+<p>QRを読み取ったスマートフォンを管理者に見せながら申請します。<strong>メールアドレスもパスワードも入力不要</strong>です。</p>
+<button type="button" id="startNoEmail" disabled>メールを使わず登録申請する</button>
+<p class="hint">申請後、次の画面に6桁の確認番号が表示されます。管理者が本人・名前・番号を対面で確認するまではログインできません。</p>
+<details id="emailAlternative">
+<summary style="font-weight:700;cursor:pointer">従来のメール認証で試す場合（開発者向け）</summary>
 <label for="staffEmail">登録済みメールアドレス</label>
 <input type="email" id="staffEmail" placeholder="example@hospital.jp" autocomplete="email">
 <label for="authMethod">認証方式（試験用）</label>
@@ -90,10 +95,11 @@ footer{font-size:.81rem;color:#596979;padding-top:12px}
 <button type="button" id="refreshLogin" disabled class="secondary" style="margin-top:12px">ログイン状態を確認</button>
 <p class="hint" id="authHelp">Supabaseの標準メールは送信先と回数に制限があります。Freeプランでの職員全員の実運用には利用できません。実メールは送信せず、最初は模擬テストで確認します。</p>
 <p class="hint">ログインリンクを開く際は、QRを読み取ったブラウザと同じブラウザを使用してください。ログインしたら元のQR画面に戻り、上の「ログイン状態を確認」を押してください。</p>
+</details>
 </section>
 <section class="card">
 <h2><span class="step">STEP 3</span> 管理者に対面申請</h2>
-<button id="startRequest" disabled>この端末から登録申請を送る</button>
+<button id="startRequest" disabled class="secondary">メール認証済みの場合の登録申請</button>
 <p class="hint">申請後、下の6桁の確認番号を、対面している管理者に伝えてください。QRに確認番号は含まれません。</p>
 <div id="staffCodeSection" class="hidden">
 <div class="code" id="staffCode">------</div>
@@ -103,7 +109,8 @@ footer{font-size:.81rem;color:#596979;padding-top:12px}
 <section class="card">
 <h2><span class="step">STEP 4</span> 承認後に登録を完了</h2>
 <p>管理者の画面で承認されたら、下のボタンを押してください。</p>
-<button id="finishRequest" disabled>承認を確認して端末登録を完了</button>
+<button id="finishNoEmail" disabled>承認を確認してログイン・端末登録</button>
+<button id="finishRequest" disabled class="secondary">メール認証で登録した場合の完了操作</button>
 <p class="hint" id="finishHelp">完了後は既存の赤伝Ver.6を開いて利用します。</p>
 <a id="openVer6" href="./ver6-preview.html" class="hidden">Ver.6試験ページを開く</a>
 </section>
@@ -190,7 +197,9 @@ const refreshButtons=()=>{
  $('prepareBootstrap').disabled=!online || !APP.user;
  $('signout').disabled=!online;
  $('startRequest').disabled=!online || !APP.user || !sessionStorage.getItem('akaden_qr_invite');
+ $('startNoEmail').disabled=!online || !sessionStorage.getItem('akaden_qr_invite');
  $('finishRequest').disabled=!online || !APP.user || !getProof().request_id;
+ $('finishNoEmail').disabled=!online || !getProof().request_id;
  const adminSession=online&&!!APP.user;
  for(const id of ['issueQr','refreshPending','approveRequest','refreshDevices','revokeDevice'])
   $(id).disabled=!adminSession;
@@ -221,6 +230,17 @@ const requireAuth=async()=>{
  const {data:{session},error}=await APP.client.auth.getSession();
  if(error||!session?.access_token)throw new Error('ログインが必要です');
  return session.access_token;
+};
+const publicEnrollmentRpc=async(action,params={})=>{
+ if(!APP.client || !APP.base || !APP.key)throw new Error('先に接続してください');
+ const response=await fetch(APP.base+'/functions/v1/ver6-face-to-face-enrollment',{
+  method:'POST',mode:'cors',cache:'no-store',referrerPolicy:'no-referrer',
+  headers:{'Content-Type':'application/json','apikey':APP.key},
+  body:JSON.stringify({action,...params})
+ });
+ const json=await response.json();
+ if(!response.ok)throw new Error(json.error||'承認待ち、期限切れ、または利用済みです');
+ return json;
 };
 const rpc=async(action,params={})=>{
  const bearer=await requireAuth();
@@ -359,12 +379,14 @@ const verifyOtp=async()=>{
  await refreshIdentity();
  note('メールでの本人確認に成功しました。管理者に対面申請を送ってください。','success');
 };
-const startRequest=async()=>{
+const startRequest=async(withoutEmail=false)=>{
  const invite=sessionStorage.getItem('akaden_qr_invite')||'';
  if(!isHex64(invite))throw new Error('登録用QRを読み取ってください');
  const secret=randomHex(),code=confirmationCode();
- const res=await rpc('start',{invite_token:invite,browser_secret:secret,
-  confirmation_code:code});
+ const payload={invite_token:invite,browser_secret:secret,confirmation_code:code};
+ const res=withoutEmail
+  ?await publicEnrollmentRpc('start',payload)
+  :await rpc('start',payload);
  if(!res.request_id)throw new Error('申請IDが取得できません');
  sessionStorage.setItem('akaden_qr_browser_secret',secret);
  sessionStorage.setItem('akaden_qr_request_id',res.request_id);
@@ -373,6 +395,35 @@ const startRequest=async()=>{
  $('requestLabel').textContent=res.request_id;
  show('staffCodeSection',true);
  note('管理者の前で6桁の確認番号を提示してください。','success');
+};
+const finishNoEmail=async()=>{
+ const {request_id,browser_secret}=getProof();
+ if(!request_id||!isHex64(browser_secret||''))
+   throw new Error('先にQRから対面登録の申請を送ってください');
+ if(!APP.user){
+   // Only the approved scanning browser can request a token_hash, once.
+   // This token is an Auth credential and must NEVER be logged or stored.
+   const proof=await publicEnrollmentRpc('redeem',{request_id,browser_secret});
+   if(!isHex64(proof.token_hash)||proof.type!=='magiclink')
+     throw new Error('ログイン認証情報を取得できませんでした');
+   const {data,error}=await APP.client.auth.verifyOtp({
+     token_hash:proof.token_hash,type:'magiclink'
+   });
+   if(error||!data?.session||!data?.user)
+     throw new Error('Supabase Authによる本人ログインに失敗しました。管理者にQRの再発行を依頼してください');
+   await refreshIdentity();
+ }
+ // This endpoint independently validates REAL auth.getUser(jwt),
+ // JWT session_id ownership, and atomically enrolls the session through DB.
+ const res=await rpc('finish',{request_id,browser_secret});
+ if(!res.enrolled)
+   throw new Error('ログインしましたが、端末承認が完了できません。管理者に連絡してください');
+ sessionStorage.removeItem('akaden_qr_request_id');
+ sessionStorage.removeItem('akaden_qr_browser_secret');
+ $('staffCode').textContent='------';
+ show('staffCodeSection',false);
+ show('openVer6',true);
+ note('対面承認・ログイン・端末登録が完了しました。','success');
 };
 const finishRequest=async()=>{
  const {request_id,browser_secret}=getProof();
@@ -430,7 +481,8 @@ bind('sendOtp',sendOtp);bind('verifyOtp',verifyOtp);
 bind('refreshLogin',async()=>{await refreshIdentity();
  note(APP.user?'ログインを確認しました。QR登録申請を進めてください。':'まだログインしていません。','info');});
 $('authMethod').addEventListener('change',updateAuthMethod);
-bind('startRequest',startRequest);bind('finishRequest',finishRequest);
+bind('startRequest',()=>startRequest(false));bind('startNoEmail',()=>startRequest(true));
+bind('finishRequest',finishRequest);bind('finishNoEmail',finishNoEmail);
 bind('refreshPending',pending);bind('approveRequest',approve);
 bind('refreshDevices',devices);bind('revokeDevice',revoke);
 $('adminTab').addEventListener('click',()=>setTab('admin'));
