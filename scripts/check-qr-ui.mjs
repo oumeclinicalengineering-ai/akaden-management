@@ -10,6 +10,9 @@ const adminView=read('supabase/migrations/20261029_enrollment_admin_views_DRAFT.
 const bootstrap=read('supabase/migrations/20261029_admin_bootstrap_DRAFT.sql');
 const recovery=read('supabase/migrations/20261029_admin_device_recovery_DRAFT.sql');
 const sessions=read('supabase/migrations/20261029_device_sessions_DRAFT.sql');
+const noEmailApi=read('supabase/functions/ver6-face-to-face-enrollment/index.ts');
+const noEmailSql=read('supabase/migrations/20261029_face_to_face_auth_claim_DRAFT.sql');
+const noEmailConfig=read('supabase/config.toml');
 
 const scripts=[...page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
 let inlineCount=0;
@@ -90,4 +93,24 @@ for (const filename of fs.readdirSync(new URL('../tests/postgres/',import.meta.u
  assert.ok(!/^\s*(?:DO \$|END \$;)\s*$/m.test(sql),
    'Malformed PL/pgSQL delimiter in '+filename);
 }
-console.log('PASS: UI/OTP, operator-only recovery, live Auth session deny, QR and bootstrap gates');
+for(const id of ['startNoEmail','finishNoEmail']) {
+ assert.ok(page.includes('id="'+id+'"'),'Missing no-email staff UI: '+id);
+}
+assert.ok(page.includes("type:'magiclink'") && page.includes('publicEnrollmentRpc'),
+ 'Email-free flow must use official Auth verifyOtp after restricted server proof');
+assert.ok(noEmailApi.includes("client.auth.admin.generateLink") &&
+ noEmailApi.includes("type:'magiclink'"),'Email-free proof must be real GoTrue magiclink');
+assert.ok(noEmailApi.includes("QR_FACE_TO_FACE_ENABLED") &&
+ noEmailApi.includes("QR_ENROLLMENT_ENABLED"),'Disabled-by-default feature gates required');
+assert.ok(noEmailApi.includes('origin!==allowed'),'Restrict trusted browser Origin');
+assert.ok(noEmailSql.includes('credential_claimed_at IS NULL') &&
+ noEmailSql.includes('r.approved_at IS NOT NULL') &&
+ noEmailSql.includes('r.browser_secret_hash=p_browser_secret_hash') &&
+ noEmailSql.includes('r.expires_at>now()'),'SQL must require approval, proof, expiry and one-time claim');
+assert.ok(noEmailSql.includes('TO service_role') &&
+ noEmailSql.includes('FROM PUBLIC,anon,authenticated'),
+ 'No anonymous direct credential claim RPC');
+assert.ok(noEmailConfig.includes('verify_jwt = false') &&
+ noEmailConfig.includes('[functions.ver6-face-to-face-enrollment]'),
+ 'Unauthenticated QR bootstrap requires explicit JWT-off function config');
+console.log('PASS: email-free staff QR proof, official GoTrue Auth, operator-only recovery, RLS guards');
