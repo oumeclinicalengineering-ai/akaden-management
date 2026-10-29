@@ -53,6 +53,16 @@ Deno.serve(async request=>{
   const client=createClient(url,serviceKey,{
     auth:{persistSession:false,autoRefreshToken:false}
   });
+  // Persistent, transactional Postgres budgets. The platform's Auth rate
+  // limits do not automatically protect this anonymous Edge Function.
+  // Any DB error FAILS CLOSED. Do not use an in-memory per-isolate counter.
+  const budget=async(action:'start'|'redeem',reference:string):Promise<'allow'|'deny'|'error'>=>{
+    const {data,error}=await client.rpc('consume_qr_enrollment_rate_budget',{
+      p_action:action,p_reference:reference
+    });
+    if(error)return 'error';
+    return data===true?'allow':'deny';
+  };
   try{
     const action=field(body,'action');
     if(action==='start'){
@@ -63,8 +73,15 @@ Deno.serve(async request=>{
       const code=field(body,'confirmation_code');
       if(!hex64.test(qr)||!hex64.test(secret)||!/^\d{6}$/.test(code))
         return reply(400,{error:'Invalid invite or request'});
+      const inviteHash=await hash(qr);
+      const gate=await budget('start',inviteHash);
+      if(gate==='error')return reply(503,{error:'Enrollment protection unavailable'});
+      if(gate==='deny'){
+        headers['Retry-After']='60';
+        return reply(429,{error:'Too many enrollment requests or invalid invitation'});
+      }
       const {data,error}=await client.rpc('start_device_enrollment',{
-        p_invite_hash:await hash(qr),
+        p_invite_hash:inviteHash,
         p_browser_secret_hash:await hash(secret),
         p_confirmation_code_hash:await hash(code)
       });
@@ -77,6 +94,12 @@ Deno.serve(async request=>{
       const secret=field(body,'browser_secret');
       if(!uuid.test(requestId)||!hex64.test(secret))
         return reply(400,{error:'Invalid request'});
+      const gate=await budget('redeem',requestId);
+      if(gate==='error')return reply(503,{error:'Enrollment protection unavailable'});
+      if(gate==='deny'){
+        headers['Retry-After']='60';
+        return reply(429,{error:'Too many requests or invalid enrollment request'});
+      }
       // Atomically marks one approved browser claim, once only.
       // Do NOT return staff name or email on a missing/invalid proof.
       const {data,error}=await client.rpc('claim_approved_face_to_face_auth',{
