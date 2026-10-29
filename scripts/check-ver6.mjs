@@ -1,0 +1,10 @@
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+const html=readFileSync(new URL('../ver6-recovery.html',import.meta.url),'utf8');
+const required=['lang="ja"','name="viewport"','supabase.createClient','signInWithPassword','auth.getUser','from(\'profiles\')','from(\'orders\')','from(\'receipts\')',"rpc('add_receipt'","rpc('change_receipt'","rpc('cancel_receipt'","role==='admin'",'created_by===user.id'];
+for(const s of required)assert.ok(html.includes(s),'Missing feature: '+s);
+assert.ok(!/sb_secret_[A-Za-z0-9_-]{10,}/.test(html),'Secret API key must not be committed');
+assert.ok(!/service_role\s*[:=]\s*['"][A-Za-z0-9_-]{20,}/.test(html),'Service role key must not be committed');
+assert.ok(html.includes('架空データ専用'),'Test data warning missing');
+assert.ok(html.includes('max-width:500px'),'Mobile responsive style missing');
+console.log('Ver6 static checks passed (does not verify Supabase RPC or RLS).');
