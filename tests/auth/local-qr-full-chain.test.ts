@@ -25,16 +25,19 @@ Deno.test('Real admin approval -> one-time QR Auth -> approved device -> revocat
   const opts = { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } };
   const server = createClient(url, service, opts);
   const browser = () => createClient(url, anon, opts);
+  let fixtureStep = 0;
   const sql = async (statement: string) => {
+    fixtureStep++;
     const child = new Deno.Command('psql', {
-      args: ['-X', '-tA', '-v', 'ON_ERROR_STOP=1'],
-      env: { PGDATABASE: dbUrl }, stdin: 'piped', stdout: 'piped', stderr: 'piped',
+      args: ['--dbname', dbUrl, '-X', '-tA', '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=sqlstate'],
+      stdin: 'piped', stdout: 'piped', stderr: 'piped',
     }).spawn();
     const writer = child.stdin.getWriter();
     await writer.write(new TextEncoder().encode(statement)); await writer.close();
     const result = await child.output();
     // Avoid printing SQL, credentials, invitation hashes or PostgreSQL diagnostics.
-    check(result.success, 'Disposable fixture SQL failed');
+    const state = new TextDecoder().decode(result.stderr).match(/(?:ERROR|FATAL):\s+([0-9A-Z]{5})\b/)?.[1] ?? 'unavailable';
+    check(result.success, `Disposable fixture SQL failed at step ${fixtureStep} (SQLSTATE ${state})`);
     return new TextDecoder().decode(result.stdout).trim();
   };
   const newUser = async (role: 'admin' | 'staff') => {
