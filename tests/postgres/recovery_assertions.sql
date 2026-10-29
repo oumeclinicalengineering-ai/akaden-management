@@ -194,4 +194,21 @@ BEGIN
       v_events,v_active_admin,v_old_lost;
  END IF;
 END $$;
+-- A registered but signed-out OTHER administrator is NOT a viable
+-- fallback for revoking the last currently working administrator handset.
+DELETE FROM auth.sessions
+ WHERE id='cccccccc-2222-4222-8222-cccccccccccc';
+SET request.jwt.claim.sub='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+SET request.jwt.claims='{"session_id":"aaaaaaaa-6666-4666-8666-aaaaaaaaaaaa"}';
+SET ROLE authenticated;
+DO $
+BEGIN
+ BEGIN
+   PERFORM public.revoke_enrolled_device('aaaaaaaa-6666-4666-8666-aaaaaaaaaaaa');
+   RAISE EXCEPTION 'final working admin device was revoked';
+ EXCEPTION WHEN insufficient_privilege THEN
+   RAISE NOTICE 'PASS: signed-out backup admin is not counted as active';
+ END;
+END $;
+RESET ROLE;
 SELECT 'PASS: operator-only admin recovery, audit, scoped revocation and RLS' AS result;
