@@ -1,0 +1,37 @@
+name: Ver6 QR browser and API static checks
+on:
+  push:
+    branches: [feature/ver6-qr-enrollment-design]
+    paths:
+      - 'ver6-qr-registration-dev.html'
+      - 'vendor/qrcodejs/**'
+      - 'supabase/functions/ver6-enrollment-api/**'
+      - 'supabase/migrations/20261029_finalize_device_enrollment_DRAFT.sql'
+      - 'supabase/migrations/20261029_enrollment_admin_views_DRAFT.sql'
+      - 'scripts/check-qr-ui.mjs'
+      - '.github/workflows/qr-browser-check.yml'
+  pull_request:
+    paths:
+      - 'ver6-qr-registration-dev.html'
+      - 'vendor/qrcodejs/**'
+      - 'supabase/functions/ver6-enrollment-api/**'
+      - 'scripts/check-qr-ui.mjs'
+      - '.github/workflows/qr-browser-check.yml'
+permissions:
+  contents: read
+jobs:
+  check-browser-and-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check QR and OTP page syntax and safety markers
+        run: node scripts/check-qr-ui.mjs
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: 'v2.x'
+      - name: Type-check staged Supabase Edge Function
+        run: deno check supabase/functions/ver6-enrollment-api/index.ts
