@@ -201,7 +201,7 @@ DELETE FROM auth.sessions
 SET request.jwt.claim.sub='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 SET request.jwt.claims='{"session_id":"aaaaaaaa-6666-4666-8666-aaaaaaaaaaaa"}';
 SET ROLE authenticated;
-DO $
+DO $$
 BEGIN
  BEGIN
    PERFORM public.revoke_enrolled_device('aaaaaaaa-6666-4666-8666-aaaaaaaaaaaa');
@@ -209,6 +209,6 @@ BEGIN
  EXCEPTION WHEN insufficient_privilege THEN
    RAISE NOTICE 'PASS: signed-out backup admin is not counted as active';
  END;
-END $;
+END $$;
 RESET ROLE;
 SELECT 'PASS: operator-only admin recovery, audit, scoped revocation and RLS' AS result;
