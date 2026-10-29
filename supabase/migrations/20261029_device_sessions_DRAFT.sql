@@ -95,11 +95,28 @@ BEGIN
       OR NOT (SELECT app_private.has_approved_device_session()) THEN
     RAISE EXCEPTION '管理者の承認済み端末からのみ操作できます' USING ERRCODE='42501';
   END IF;
+  -- Serialize simultaneous revocations so two admins cannot each revoke the
+  -- other's last active device and accidentally lock out all administrators.
+  LOCK TABLE app_private.approved_device_sessions IN SHARE ROW EXCLUSIVE MODE;
+  SELECT s.user_id INTO v_target_user_id
+  FROM app_private.approved_device_sessions s
+  WHERE s.session_id = p_session_id AND s.revoked_at IS NULL;
+  IF NOT FOUND THEN RETURN false; END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.profiles p
+    WHERE p.user_id = v_target_user_id AND p.active AND p.role = 'admin'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM app_private.approved_device_sessions s
+      JOIN public.profiles p ON p.user_id = s.user_id
+    WHERE s.session_id <> p_session_id AND s.revoked_at IS NULL
+      AND p.active AND p.role = 'admin'
+  ) THEN
+    RAISE EXCEPTION '最後の有効な管理者端末は無効化できません'
+      USING ERRCODE = '42501';
+  END IF;
   UPDATE app_private.approved_device_sessions
   SET revoked_at = now(), revoked_by = (SELECT auth.uid())
-  WHERE session_id = p_session_id AND revoked_at IS NULL
-  RETURNING user_id INTO v_target_user_id;
-  IF NOT FOUND THEN RETURN false; END IF;
+  WHERE session_id = p_session_id AND revoked_at IS NULL;
   INSERT INTO app_private.device_security_events
     (event_type,user_id,session_id,actor_id)
   VALUES('DEVICE_REVOKED',v_target_user_id,p_session_id,(SELECT auth.uid()));
