@@ -15,9 +15,18 @@ const hash=async(value:string):Promise<string>=> {
 };
 const field=(obj:Body,k:string):string=>typeof obj[k]==='string'?obj[k] as string:'';
 
-Deno.serve(async request=>{
+// The exported handler allows isolated HTTP tests with a mock Supabase
+// client. In normal Edge deployment import.meta.main is true and serves HTTP.
+export type FaceToFaceDependencies = {
+  env?: (name:string)=>string|undefined;
+  client?: ReturnType<typeof createClient>;
+};
+export const handleFaceToFaceRequest=async (
+  request:Request,deps:FaceToFaceDependencies={}
+):Promise<Response>=>{
+  const env=deps.env ?? ((name:string)=>Deno.env.get(name));
   const origin=request.headers.get('origin')??'';
-  const allowed=Deno.env.get('QR_ALLOWED_ORIGIN')??'';
+  const allowed=env('QR_ALLOWED_ORIGIN')??'';
   const headers:Record<string,string>={
     'Content-Type':'application/json; charset=utf-8',
     'Cache-Control':'no-store, no-cache, max-age=0',
@@ -35,11 +44,11 @@ Deno.serve(async request=>{
   headers['Access-Control-Allow-Headers']='apikey, authorization, content-type';
   if(request.method==='OPTIONS')return new Response(null,{status:204,headers});
   if(request.method!=='POST')return reply(405,{error:'POST only'});
-  if(Deno.env.get('QR_ENROLLMENT_ENABLED')!=='true' ||
-     Deno.env.get('QR_FACE_TO_FACE_ENABLED')!=='true')
+  if(env('QR_ENROLLMENT_ENABLED')!=='true' ||
+     env('QR_FACE_TO_FACE_ENABLED')!=='true')
     return reply(503,{error:'Face-to-face enrollment not enabled'});
-  const url=Deno.env.get('SUPABASE_URL')??'';
-  const serviceKey=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')??'';
+  const url=env('SUPABASE_URL')??'';
+  const serviceKey=env('SUPABASE_SERVICE_ROLE_KEY')??'';
   if(!url || !serviceKey)return reply(503,{error:'Server not configured'});
   let body:Body;
   try{
@@ -50,7 +59,7 @@ Deno.serve(async request=>{
       return reply(400,{error:'Invalid input'});
     body=value as Body;
   }catch{return reply(400,{error:'Invalid JSON'})}
-  const client=createClient(url,serviceKey,{
+  const client=deps.client ?? createClient(url,serviceKey,{
     auth:{persistSession:false,autoRefreshToken:false}
   });
   // Persistent, transactional Postgres budgets. The platform's Auth rate
@@ -132,4 +141,7 @@ Deno.serve(async request=>{
     // Do not log QR text, browser proof, Auth token_hash, or service role key.
     return reply(503,{error:'Enrollment temporarily unavailable'});
   }
-});
+};
+if(import.meta.main){
+  Deno.serve(request=>handleFaceToFaceRequest(request));
+}
