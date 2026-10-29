@@ -7,6 +7,9 @@ import { createClient } from 'npm:@supabase/supabase-js@2.57.0';
 
 type Body = Record<string,unknown>;
 const hex64=/^[a-f0-9]{64}$/;
+// GoTrue's hashed_token is opaque and URL-safe, NOT necessarily 64-char hex.
+// Validate syntax here; only Supabase verifyOtp can validate its authenticity.
+const authTokenHash=/^[A-Za-z0-9_-]{43,128}$/;
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const hash=async(value:string):Promise<string>=> {
   const bytes=new TextEncoder().encode(value);
@@ -146,7 +149,7 @@ export const handleFaceToFaceRequest=async (
       });
       const hashedToken=link?.properties?.hashed_token;
       if(linkError || link?.user?.id!==targetId ||
-          !hashedToken || !hex64.test(hashedToken))
+          !hashedToken || !authTokenHash.test(hashedToken))
         return reply(503,{error:'Could not issue an Auth proof; ask for new QR'});
       // This is an actual LOGIN CREDENTIAL. Return it once, ONLY to browser
       // holding request_id + private 256-bit secret AFTER admin approval.

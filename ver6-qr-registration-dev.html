@@ -175,6 +175,8 @@ const APP={client:null,base:'',key:'',tab:'staff',user:null};
 const show=(id,visible)=>$(id).classList.toggle('hidden',!visible);
 const note=(message,kind='info')=>{const n=$('notice');n.textContent=message;n.dataset.kind=kind;};
 const isHex64=x=>/^[a-f0-9]{64}$/.test(x);
+// The magiclink hashed_token from GoTrue is opaque (56 URL-safe chars in local test).
+const isAuthTokenHash=x=>typeof x==='string'&&/^[A-Za-z0-9_-]{43,128}$/.test(x);
 const apiEnabled=()=>!!APP.client&&location.protocol==='https:';
 const getProof=()=>({
  request_id:sessionStorage.getItem('akaden_qr_request_id'),
@@ -404,7 +406,7 @@ const finishNoEmail=async()=>{
    // Only the approved scanning browser can request a token_hash, once.
    // This token is an Auth credential and must NEVER be logged or stored.
    const proof=await publicEnrollmentRpc('redeem',{request_id,browser_secret});
-   if(!isHex64(proof.token_hash)||proof.type!=='magiclink')
+   if(!isAuthTokenHash(proof.token_hash)||proof.type!=='magiclink')
      throw new Error('ログイン認証情報を取得できませんでした');
    const {data,error}=await APP.client.auth.verifyOtp({
      token_hash:proof.token_hash,type:'magiclink'

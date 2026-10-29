@@ -10,7 +10,8 @@ const TARGET='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const REQ='11111111-1111-4111-8111-111111111111';
 const QR='a'.repeat(64);
 const SECRET='b'.repeat(64);
-const TOKEN_HASH='e'.repeat(64);
+// Real local GoTrue issued a 56-character URL-safe hashed token.
+const TOKEN_HASH='e'.repeat(56);
 const checks:(truth:unknown,what:string)=>asserts truth=(truth,what)=>{
  if(!truth)throw new Error(what);
 };

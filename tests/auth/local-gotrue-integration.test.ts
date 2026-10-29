@@ -58,7 +58,12 @@ Deno.test('Real local GoTrue magiclink -> session -> RLS; replay denied', async 
   check(!seedError, 'Service role could not insert fake RLS row');
   const { data: anonRows, error: anonError } = await unrelatedBrowser
     .from('akaden_local_auth_rls_probe').select('owner_id');
-  check(!anonError && anonRows?.length === 0, 'Anonymous browser bypassed RLS');
+  // Both a PostgreSQL permission denial (42501) and an RLS-filtered empty result
+  // mean that the anonymous browser cannot see the row. Any row is a failure.
+  const anonDenied = (!anonError && anonRows?.length === 0) ||
+    (anonError?.code === '42501' && !anonRows?.length);
+  check(anonDenied, 'Anonymous access returned an unexpected result: ' +
+    (anonError?.code ?? 'no SQL error'));
   const { data: ownerRows, error: ownerError } = await staff
     .from('akaden_local_auth_rls_probe').select('owner_id');
   check(!ownerError && ownerRows?.length === 1 && ownerRows[0].owner_id === staffId,

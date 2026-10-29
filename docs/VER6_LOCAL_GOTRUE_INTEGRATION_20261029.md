@@ -35,3 +35,9 @@ https://supabase.com/docs/reference/javascript/auth-admin-generatelink
 https://supabase.com/docs/reference/javascript/auth-verifyotp
 https://supabase.com/docs/guides/local-development/cli/getting-started
 https://docs.github.com/en/billing/concepts/product-billing/github-actions
+
+## 実GoTrue結合テストからの追加知見（2026-10-29）
+- 一時GoTrueが発行した `hashed_token` は**56文字**、旧コードが期待した64文字hexではない。Edge APIと未公開のQR開発画面にのみ、URL-safe opaque token用の構文検証を別途追加した。既存のQR/端末秘密用hex64検証は維持。
+- `generateLink` 後の実 `verifyOtp` と `getUser` は、テストのRLS判定に到達するまで正常に動作した。途中結果であり、CI全体成功とはまだ扱わない。
+- 匿名側にはテーブルSELECTのGRANTがないため、`42501` 権限エラーは正しい拒否。RLSフィルターで空配列が返る場合と共に明示的に検査し、行が返った場合は必ず失敗させる。
+- この修正を含むCIの結果が成功と判定されるまでは、本物のAuth全工程確認済みとは記載しない。
