@@ -401,8 +401,8 @@ const approve=async()=>{
  const res=await rpc('approve',{request_id:id,confirmation_code:code});
  $('approveCode').value='';
  if(!res.approved)throw new Error('確認番号が一致しないか、申請は無効です');
- note('管理者による対面承認を記録しました。スタッフに完了ボタンを押してもらってください。','success');
  await pending();
+ note('管理者による対面承認を記録しました。スタッフに完了ボタンを押してもらってください。','success');
 };
 const devices=async()=>{
  const res=await rpc('devices');
@@ -418,8 +418,8 @@ const revoke=async()=>{
  if(!confirm('選択した端末の赤伝データへのアクセスを無効化しますか？'))return;
  const res=await rpc('revoke',{session_id:id});
  if(!res.revoked)throw new Error('すでに無効化されたか、対象が見つかりません');
- note('旧端末の承認を無効化しました。','success');
  await devices();
+ note('旧端末の承認を無効化しました。','success');
 };
 const bind=(id,fn)=>$(id).addEventListener('click',()=>safe(fn));
 bind('connect',connect);
