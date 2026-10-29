@@ -13,6 +13,7 @@ const sessions=read('supabase/migrations/20261029_device_sessions_DRAFT.sql');
 const noEmailApi=read('supabase/functions/ver6-face-to-face-enrollment/index.ts');
 const noEmailSql=read('supabase/migrations/20261029_face_to_face_auth_claim_DRAFT.sql');
 const noEmailConfig=read('supabase/config.toml');
+const rateBudgetSql=read('supabase/migrations/20261029_qr_abuse_rate_budgets_DRAFT.sql');
 
 const scripts=[...page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
 let inlineCount=0;
@@ -113,4 +114,14 @@ assert.ok(noEmailSql.includes('TO service_role') &&
 assert.ok(noEmailConfig.includes('verify_jwt = false') &&
  noEmailConfig.includes('[functions.ver6-face-to-face-enrollment]'),
  'Unauthenticated QR bootstrap requires explicit JWT-off function config');
-console.log('PASS: email-free staff QR proof, official GoTrue Auth, operator-only recovery, RLS guards');
+assert.ok(noEmailApi.includes("client.rpc('consume_qr_enrollment_rate_budget'") &&
+ noEmailApi.includes("gate==='error'") &&
+ noEmailApi.includes("gate==='deny'"),
+ 'Anonymous QR API must call persistent rate limiter and fail closed');
+assert.ok(rateBudgetSql.includes('ON CONFLICT(action,scope) DO UPDATE') &&
+ rateBudgetSql.includes('v_global_limit:=120') &&
+ rateBudgetSql.includes('v_per_reference_limit:=6') &&
+ rateBudgetSql.includes('FROM PUBLIC,anon,authenticated') &&
+ rateBudgetSql.includes('TO service_role'),
+ 'Server-only atomic per-global and per-reference budgets required');
+console.log('PASS: email-free staff QR proof, DB throttling, official Auth, operator-only recovery, RLS guards');
