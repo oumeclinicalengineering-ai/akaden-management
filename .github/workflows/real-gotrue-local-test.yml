@@ -99,18 +99,8 @@ jobs:
           ids="$RUNNER_TEMP/akaden-real-auth-ids.txt"
           uid="$(sed -n '1p' "$ids")"
           sid="$(sed -n '2p' "$ids")"
-          printf '%s' "$uid" | grep -Eq '^[0-9a-f-]{36}
-        if: always()
-        run: |
-          npx --yes supabase@2.122.0 --workdir "$RUNNER_TEMP/akaden-ver6-real-auth" stop --no-backup || true
-          rm -f "$RUNNER_TEMP/akaden-real-auth-ids.txt"
-
-          printf '%s' "$sid" | grep -Eq '^[0-9a-f-]{36}
-        if: always()
-        run: |
-          npx --yes supabase@2.122.0 --workdir "$RUNNER_TEMP/akaden-ver6-real-auth" stop --no-backup || true
-          rm -f "$RUNNER_TEMP/akaden-real-auth-ids.txt"
-
+          printf '%s' "$uid" | grep -Eq '^[0-9a-f-]{36}$'
+          printf '%s' "$sid" | grep -Eq '^[0-9a-f-]{36}$'
           psql "$LOCAL_DB_URL" -X -v ON_ERROR_STOP=1 \
             -v staff_uid="$uid" -v session_id="$sid" \
             -f tests/auth/local-qr-real-session.test.sql
