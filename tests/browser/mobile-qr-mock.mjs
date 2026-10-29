@@ -142,6 +142,8 @@ try{
    await staff.locator('#connect').click();
 
    assert.equal(await staff.locator('#authMethod').inputValue(),'magic');
+   // Email fallback is now an optional collapsed section; open it explicitly.
+   await staff.locator('#emailAlternative summary').click();
    await staff.locator('#staffEmail').fill('staff@example.invalid');
    await staff.locator('#sendOtp').click();
    const option=await staff.evaluate(()=>window.__fakeAuth.state.otpCalls.at(-1));
