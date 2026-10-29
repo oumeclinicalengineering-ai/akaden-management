@@ -1,0 +1,45 @@
+name: Ver6 isolated PostgreSQL quantity guard test
+on:
+  pull_request:
+    paths:
+      - 'tests/postgres/ver6_core_*.sql'
+      - '.github/workflows/ver6-core-postgres-test.yml'
+  push:
+    branches:
+      - feature/ver6-simple-core-20261029
+    paths:
+      - 'tests/postgres/ver6_core_*.sql'
+      - '.github/workflows/ver6-core-postgres-test.yml'
+permissions:
+  contents: read
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test_only_password
+          POSTGRES_DB: isolated_ver6
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: test_only_password
+      PGDATABASE: isolated_ver6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize synthetic schema
+        run: psql -X -v ON_ERROR_STOP=1 -f tests/postgres/ver6_core_fixture.sql
+      - name: Apply guard to disposable PostgreSQL only
+        run: psql -X -v ON_ERROR_STOP=1 -f tests/postgres/ver6_core_guard_DRAFT.sql
+      - name: Assert quantity guard, roles and triggers
+        run: psql -X -v ON_ERROR_STOP=1 -f tests/postgres/ver6_core_assertions.sql
