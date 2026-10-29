@@ -62,6 +62,14 @@ jobs:
             *) echo 'REFUSED: non-local database'; exit 1 ;;
           esac
           psql "$LOCAL_DB_URL" -X -v ON_ERROR_STOP=1 -f tests/auth/local-auth-probe.sql
+      - name: Load actual QR DRAFT RPCs in disposable database only
+        run: |
+          set -eu
+          case "$LOCAL_DB_URL" in
+            postgresql://*@127.0.0.1:54322/*|postgres://*@127.0.0.1:54322/*) ;;
+            *) echo 'REFUSED: non-local database'; exit 1 ;;
+          esac
+          psql "$LOCAL_DB_URL" -X -v ON_ERROR_STOP=1 -f tests/auth/local-qr-chain.sql
       - name: Test actual generateLink -> verifyOtp -> RLS
         run: |
           export LOCAL_SESSION_IDS_FILE="$RUNNER_TEMP/akaden-real-auth-ids.txt"
