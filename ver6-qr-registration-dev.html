@@ -110,14 +110,14 @@ footer{font-size:.81rem;color:#596979;padding-top:12px}
 <p class="hint">このパスワードは保存しません。QR登録前に管理者端末の初期承認が必要です。</p>
 </section>
 <section class="card" id="adminBootstrapCard">
-<h2>初回管理者端末の準備（管理者専用）</h2>
-<p>既存の管理者でログインすると、この端末の<strong>管理者ID・セッションID</strong>を確認できます。これらは認証用のパスワードやJWTではありません。</p>
-<p class="hint">初回登録はSupabase SQL Editorを操作できる管理者が対面確認し、専用SQLで1回だけ行う設計です。<strong>この画面では承認・DB更新を行いません。</strong></p>
-<button type="button" id="prepareBootstrap" disabled class="secondary">初回承認に必要なIDを確認</button>
+<h2>初回登録・紛失復旧の準備（SQL管理者による確認が必要）</h2>
+<p>アカウントにログインすると、この端末の<strong>ユーザーID・セッションID</strong>を確認できます。これらは認証用のパスワードやJWTではありません。</p>
+<p class="hint">初回登録・端末紛失時の復旧は、Supabase SQL Editorを操作できる責任者が対面で本人と端末を確認し、SQL側で本当に管理者か検証する設計です。<strong>この画面では承認・DB更新を行いません。</strong></p>
+<button type="button" id="prepareBootstrap" disabled class="secondary">初回承認・紛失復旧用のIDを確認</button>
 <div id="bootstrapDetails" class="hidden">
-<label>管理者ユーザーID</label><p id="bootstrapUserId" class="hint" style="overflow-wrap:anywhere">—</p>
+<label>ログイン中のユーザーID（SQL Editorで管理者判定）</label><p id="bootstrapUserId" class="hint" style="overflow-wrap:anywhere">—</p>
 <label>現在のログインセッションID</label><p id="bootstrapSessionId" class="hint" style="overflow-wrap:anywhere">—</p>
-<p class="hint">この2つのIDはSupabaseの管理画面だけで照合してください。アクセストークン・リフレッシュトークンやパスワードは共有しないでください。</p>
+<p class="hint">SQL Editorの責任者が、これらのIDが有効な管理者と実在するAuthセッションに一致するかを照合してください。アクセストークン・リフレッシュトークンやパスワードは共有しないでください。</p>
 </div>
 </section>
 <section class="card">
@@ -277,7 +277,7 @@ const adminLogin=async()=>{
  if(error)throw error;
  await refreshIdentity();
  try{await loadStaff()}catch{ /* Bootstrap may precede RLS cutover; do not treat it as failed login. */ }
- note('管理者としてログインしました。最初に「初回承認に必要なIDを確認」を押してください。','success');
+ note('管理者としてログインしました。必要な場合は「初回承認・紛失復旧用のIDを確認」を押してください。','success');
 };
 const showBootstrapIds=async()=>{
  const token=await requireAuth();
@@ -287,14 +287,13 @@ const showBootstrapIds=async()=>{
  if(error || !user || claims?.sub!==user.id || typeof claims?.session_id!=='string'
    || !/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(claims.session_id))
    throw new Error('このログインのユーザーIDとセッションIDを検証できません');
- const {data:profile,error:profileError}=await APP.client.from('profiles')
-   .select('role,active').eq('user_id',user.id).maybeSingle();
- if(profileError || profile?.role!=='admin' || profile.active!==true)
-   throw new Error('有効な管理者アカウントでログインしてください');
+ // A replacement admin device is NOT YET approved. After RLS cutover,
+ // profiles cannot be selected from such a device. Show the Auth UUIDs only;
+ // the trusted SQL Editor validates active admin role before granting access.
  $('bootstrapUserId').textContent=user.id;
  $('bootstrapSessionId').textContent=claims.session_id;
  show('bootstrapDetails',true);
- note('現在の管理者セッションを確認しました。初回承認SQLはまだ実行されていません。','success');
+ note('現在の管理者セッションを確認しました。初回承認・紛失復旧SQLはまだ実行されていません。','success');
 };
 const loadStaff=async()=>{
  const {data,error}=await APP.client.from('profiles')
