@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Check browser test JavaScript syntax before downloading browser
+        run: node --check tests/browser/mobile-qr-mock.mjs
       - name: Install pinned Playwright for this disposable run
         run: npm install --no-save --package-lock=false playwright@1.64.1
       - name: Install headless Chromium dependencies
