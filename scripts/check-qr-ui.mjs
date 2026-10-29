@@ -28,6 +28,18 @@ assert.ok(page.includes('signInWithOtp') && page.includes('shouldCreateUser:fals
  'staff must use passwordless OTP without open registration');
 assert.ok(page.includes('verifyOtp') && page.includes("type:'email'"),
  'official Supabase Auth OTP verification required');
+assert.ok(page.includes('id="authMethod"') && page.includes('value="magic"'),
+ 'Magic Link default needed on new Free projects');
+assert.ok(page.includes("options.emailRedirectTo=location.origin+location.pathname"),
+ 'Magic Link return URL required');
+assert.ok(page.includes('detectSessionInUrl:true'),
+ 'Supabase must be able to process email link callbacks');
+assert.ok(page.includes("localStorage.setItem('akaden-ver6-public-config'"),
+ 'Only public Supabase settings should persist for cross-tab Auth callbacks');
+assert.ok(page.includes("localStorage.setItem('akaden-ver6-public-config',JSON.stringify({url,key}))"),
+ 'Supabase public config storage must not be accidentally inside a comment');
+assert.ok(page.includes('shouldCreateUser:false'),'email Auth must not create accounts');
+
 for(const action of ['issue','start','pending','approve','finish','revoke','devices'])
  assert.ok(api.includes("action==='"+action+"'"),'API action missing: '+action);
 assert.ok(api.includes("Deno.env.get('QR_ENROLLMENT_ENABLED')!=='true'"),
