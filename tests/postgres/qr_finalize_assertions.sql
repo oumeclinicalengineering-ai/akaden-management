@@ -21,6 +21,35 @@ INSERT INTO complete_request
 SELECT public.start_device_enrollment(repeat('e',64),repeat('f',64),repeat('9',64));
 GRANT SELECT ON complete_request TO authenticated;
 
+-- The pending-request list must be visible only to an approved admin.
+SET request.jwt.claim.role='authenticated';
+SET request.jwt.claim.sub='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+SET request.jwt.claims='{"session_id":"bbbbbbbb-4444-4444-8444-bbbbbbbbbbbb"}';
+SET ROLE authenticated;
+DO $
+BEGIN
+  BEGIN
+    PERFORM * FROM public.list_pending_device_enrollments();
+    RAISE EXCEPTION 'staff unexpectedly listed pending registrations';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'PASS: staff cannot list enrollment requests';
+  END;
+END $;
+RESET ROLE;
+SET request.jwt.claim.sub='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+SET request.jwt.claims='{"session_id":"aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"}';
+SET ROLE authenticated;
+DO $
+DECLARE pending_count integer; device_count integer;
+BEGIN
+ SELECT count(*) INTO pending_count FROM public.list_pending_device_enrollments();
+ IF pending_count<>1 THEN RAISE EXCEPTION 'admin pending list wrong count: %',pending_count; END IF;
+ SELECT count(*) INTO device_count FROM public.list_enrolled_devices();
+ IF device_count<>1 THEN RAISE EXCEPTION 'admin enrolled device list wrong count: %',device_count; END IF;
+END $;
+RESET ROLE;
+SET request.jwt.claim.role='service_role';
+
 -- Before admin approval, finishing must be rejected without consuming request.
 DO $$
 BEGIN
