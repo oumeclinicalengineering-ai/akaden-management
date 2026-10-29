@@ -16,6 +16,7 @@ GRANT USAGE ON SCHEMA public, auth TO authenticated, anon, service_role;
 GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, anon;
 GRANT EXECUTE ON FUNCTION auth.jwt() TO authenticated, anon;
 
+ALTER TABLE public.profiles ADD COLUMN display_name text NOT NULL DEFAULT '試験スタッフ';
 ALTER TABLE public.profiles ADD COLUMN role text NOT NULL DEFAULT 'staff';
 ALTER TABLE public.profiles ADD COLUMN active boolean NOT NULL DEFAULT true;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
