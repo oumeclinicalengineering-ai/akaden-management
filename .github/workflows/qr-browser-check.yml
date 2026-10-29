@@ -15,6 +15,7 @@ on:
       - 'supabase/migrations/20261029_admin_device_recovery_DRAFT.sql'
       - 'supabase/migrations/20261029_device_sessions_DRAFT.sql'
       - 'scripts/check-qr-ui.mjs'
+      - 'tests/edge/**'
       - '.github/workflows/qr-browser-check.yml'
   pull_request:
     paths:
@@ -25,6 +26,7 @@ on:
       - 'supabase/config.toml'
       - 'supabase/migrations/20261029_face_to_face_auth_claim_DRAFT.sql'
       - 'scripts/check-qr-ui.mjs'
+      - 'tests/edge/**'
       - '.github/workflows/qr-browser-check.yml'
 permissions:
   contents: read
@@ -46,3 +48,5 @@ jobs:
         run: |
           deno check supabase/functions/ver6-enrollment-api/index.ts
           deno check supabase/functions/ver6-face-to-face-enrollment/index.ts
+      - name: Run isolated anonymous API abuse and Auth tests (no network calls)
+        run: deno test tests/edge/face_to_face_api_test.ts
