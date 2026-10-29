@@ -159,23 +159,23 @@ try{
    assert.match(code,/^\d{6}$/);
 
    await staff.locator('#finishRequest').click();
-   assert.ok((await staff.locator('#notice').textContent()).includes('not approved'));
+   await staff.waitForFunction(()=>document.querySelector('#notice').textContent.includes('not approved'));
 
    await admin.locator('#refreshPending').click();
    await admin.locator('#requestChoice').selectOption(REQUEST);
    await admin.locator('#approveCode').fill(code);
    await admin.locator('#approveRequest').click();
-   assert.ok((await admin.locator('#notice').textContent()).includes('対面承認'));
+   await admin.waitForFunction(()=>document.querySelector('#notice').textContent.includes('対面承認'));
 
    await staff.locator('#finishRequest').click();
    await staff.locator('#openVer6').waitFor({state:'visible'});
-   assert.ok((await staff.locator('#notice').textContent()).includes('登録が完了'));
+   await staff.waitForFunction(()=>document.querySelector('#notice').textContent.includes('登録が完了'));
 
    await admin.locator('#refreshDevices').click();
    await admin.locator('#deviceChoice').selectOption(SESSION);
    admin.once('dialog',d=>d.accept());
    await admin.locator('#revokeDevice').click();
-   assert.equal(config.deviceRevoked,true);
+   await admin.waitForFunction(()=>document.querySelector('#notice').textContent.includes('旧端末の承認を無効化'));\n   assert.equal(config.deviceRevoked,true);
 
    const pageWidth=await staff.evaluate(()=>({
      viewport:window.innerWidth,
