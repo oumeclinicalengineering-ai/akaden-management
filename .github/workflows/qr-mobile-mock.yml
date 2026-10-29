@@ -1,0 +1,33 @@
+name: Free QR mobile browser simulations (no live Supabase)
+on:
+  push:
+    branches: [feature/ver6-qr-enrollment-design]
+    paths:
+      - 'ver6-qr-registration-dev.html'
+      - 'tests/browser/**'
+      - '.github/workflows/qr-mobile-mock.yml'
+  pull_request:
+    paths:
+      - 'ver6-qr-registration-dev.html'
+      - 'tests/browser/**'
+      - '.github/workflows/qr-mobile-mock.yml'
+permissions:
+  contents: read
+jobs:
+  qr-mobile-mock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned Playwright for this disposable run
+        run: npm install --no-save --package-lock=false playwright@1.64.1
+      - name: Install headless Chromium dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Start local-only web server
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 > /tmp/qr-mobile-http.log 2>&1 &
+      - name: Test iPhone-like and Android-like viewports with fake Auth
+        run: node tests/browser/mobile-qr-mock.mjs
