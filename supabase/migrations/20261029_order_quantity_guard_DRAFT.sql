@@ -6,9 +6,15 @@ BEGIN;
 -- Anonymous callers do not need any of these helpers or trigger functions.
 REVOKE EXECUTE ON FUNCTION public.is_admin() FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.is_active_user() FROM PUBLIC, anon;
+-- Explicitly retain RLS helper execution for signed-in users, even when a
+-- staging project lacks the explicit grants found in the current DB.
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_active_user() TO authenticated;
 REVOKE EXECUTE ON FUNCTION public.record_audit() FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.create_profile_for_user() FROM PUBLIC, anon, authenticated;
--- Keep authenticated EXECUTE on is_admin/is_active_user: current RLS policies use them.
+-- These trigger-only functions are invoked internally by PostgreSQL; test
+-- their automatic triggers after applying the migration in staging.
+-- RLS helpers remain callable by authenticated users; anon stays revoked.
 -- Keep authenticated EXECUTE on add/change/cancel receipt: UI relies on these.
 
 CREATE OR REPLACE FUNCTION public.prevent_order_quantity_below_received()
