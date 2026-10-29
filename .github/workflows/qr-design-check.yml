@@ -1,0 +1,23 @@
+name: QR design static checks
+on:
+  push:
+    branches: [feature/ver6-qr-enrollment-design]
+  pull_request:
+    paths:
+      - 'scripts/check-qr-security.mjs'
+      - 'supabase/**'
+      - 'qr-enrollment-ui-prototype.html'
+      - '.github/workflows/qr-design-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qr-static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check QR staging design
+        run: node scripts/check-qr-security.mjs

@@ -1,0 +1,56 @@
+name: Free isolated existing Ver6 privileges regression
+on:
+  push:
+    branches: [feature/ver6-qr-enrollment-design]
+    paths:
+      - 'supabase/migrations/20261029_existing_tables_least_privilege_DRAFT.sql'
+      - 'tests/postgres/least_privilege_*'
+      - '.github/workflows/least-privilege-test.yml'
+  pull_request:
+    paths:
+      - 'supabase/migrations/20261029_existing_tables_least_privilege_DRAFT.sql'
+      - 'tests/postgres/least_privilege_*'
+      - '.github/workflows/least-privilege-test.yml'
+permissions:
+  contents: read
+jobs:
+  verify-existing-privileges:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: akaden_least_privilege
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-temporary
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d akaden_least_privilege"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: test-only-temporary
+      PGDATABASE: akaden_least_privilege
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y postgresql-client
+          fi
+      - name: Create fictional Ver6 schema and broad grants
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/fixture.sql
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/device_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/least_privilege_fixture.sql
+      - name: Apply DRAFT least-privilege grants only to disposable database
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_existing_tables_least_privilege_DRAFT.sql
+      - name: Verify browser roles and retained preview workflows
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/least_privilege_assertions.sql

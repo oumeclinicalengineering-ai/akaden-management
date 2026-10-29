@@ -1,0 +1,68 @@
+name: Free isolated lost-admin device recovery tests
+on:
+  push:
+    branches: [feature/ver6-qr-enrollment-design]
+    paths:
+      - 'supabase/migrations/20261029_admin_device_recovery_DRAFT.sql'
+      - 'supabase/migrations/20261029_admin_bootstrap_DRAFT.sql'
+      - 'supabase/migrations/20261029_device_sessions_DRAFT.sql'
+      - 'supabase/migrations/20261029_device_cutover_DRAFT.sql'
+      - 'tests/postgres/recovery_*'
+      - 'tests/postgres/bootstrap_*'
+      - 'tests/postgres/device_fixture.sql'
+      - '.github/workflows/admin-recovery-test.yml'
+  pull_request:
+    paths:
+      - 'supabase/migrations/20261029_admin_device_recovery_DRAFT.sql'
+      - 'tests/postgres/recovery_*'
+      - '.github/workflows/admin-recovery-test.yml'
+permissions:
+  contents: read
+jobs:
+  operator-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: akaden_recovery_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only-temporary
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d akaden_recovery_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: test-only-temporary
+      PGDATABASE: akaden_recovery_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure PostgreSQL client
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y postgresql-client
+          fi
+      - name: Build fictional Supabase Auth and tables
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/fixture.sql
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/device_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/bootstrap_fixture.sql
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/recovery_fixture.sql
+      - name: Apply staged session, bootstrap and recovery SQL
+        run: |
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_device_sessions_DRAFT.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_admin_bootstrap_DRAFT.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_admin_device_recovery_DRAFT.sql
+      - name: Register first admin and cut over simulated RLS
+        run: |
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/bootstrap_pre_cutover.sql
+          psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261029_device_cutover_DRAFT.sql
+          psql -v ON_ERROR_STOP=1 -f tests/postgres/bootstrap_post_cutover.sql
+      - name: Verify emergency device rotation and isolation
+        run: psql -v ON_ERROR_STOP=1 -f tests/postgres/recovery_assertions.sql

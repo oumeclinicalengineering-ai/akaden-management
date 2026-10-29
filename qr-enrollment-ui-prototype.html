@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">
+<title>赤伝 Ver.6 QR対面登録 UI試作</title>
+<style>
+:root{font-family:system-ui,-apple-system,sans-serif;color:#17324c;background:#f4f7fa}*{box-sizing:border-box}body{margin:0}header{background:#1765b1;color:white;padding:16px;font-weight:700}main{max-width:620px;margin:18px auto;padding:0 12px 40px}.panel{background:white;border:1px solid #dce5ef;border-radius:14px;padding:18px;margin:12px 0}.warning{background:#fff2d7;padding:12px;border-radius:10px}button{background:#1765b1;color:white;border:0;border-radius:9px;padding:12px 16px;font:inherit;cursor:pointer}button:disabled{background:#aebbc8;cursor:not-allowed}input{width:100%;font:inherit;padding:12px;border:1px solid #aab9c7;border-radius:9px;margin:8px 0 14px}label{display:block;font-weight:600}small{color:#506478}.step{font-weight:700;color:#1765b1}.hidden{display:none}#status{min-height:1.5em}a{color:#1765b1}</style></head>
+<body><header>赤伝管理システム Ver.6 ｜ QR対面登録（画面試作）</header>
+<main>
+<p class="warning"><strong>画面のみの試作品です。</strong> QR発行・本人確認・ログイン・端末失効は動作しません。実際の氏名、患者情報、パスワード、認証キーを入力しないでください。</p>
+<section class="panel"><p class="step">① 管理者が対象スタッフを選択</p><label for="staff">試験用スタッフ（架空）</label><select id="staff" style="width:100%;font:inherit;padding:12px"><option>試験スタッフB</option><option>試験スタッフC</option></select><p><small>本番では管理者のログインと権限をサーバーで検証します。</small></p></section>
+<section class="panel"><p class="step">② 対面で本人確認</p><label><input id="confirmed" type="checkbox" style="width:auto"> 管理者が本人を対面確認した（画面試作）</label><p><small>このチェックだけでは本人認証は成立しません。サーバー側の承認が必要です。</small></p></section>
+<section class="panel"><p class="step">③ 登録用QRを発行</p><button id="issue" disabled>QR発行（未接続）</button><p><small>実装予定：10分間有効・一回限り。秘密鍵はQRに含めません。</small></p></section>
+<section class="panel"><p class="step">④ スタッフのスマートフォンで登録</p><button disabled>QRを読み取って登録（未接続）</button><p><small>本番では追加の本人確認後、Supabase Authで安全にセッションを発行します。</small></p></section>
+<section class="panel"><p class="step">⑤ 紛失・機種変更時</p><button disabled>旧端末を無効化（未接続）</button><p><small>データベース操作を含め、旧端末からのアクセスを拒否する実装が必要です。</small></p></section>
+<p id="status" role="status">現在：画面レイアウトの確認のみ可能</p>
+</main><script>
+document.getElementById('confirmed').addEventListener('change',()=>{document.getElementById('status').textContent='対面確認のチェックを切り替えました。実際の承認・登録は行われません。';});
+</script></body></html>

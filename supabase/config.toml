@@ -1,0 +1,12 @@
+# STAGING DESIGN ONLY: DO NOT DEPLOY UNTIL SECURITY AND RATE LIMIT REVIEW.
+# The staff device has no Supabase JWT before in-person approval.
+# Consequently only THIS endpoint disables platform JWT verification; all
+# authentication is based on one-time QR + 256-bit per-browser proof + admin
+# approval + official Supabase Auth verification after redeem.
+[functions.ver6-face-to-face-enrollment]
+verify_jwt = false
+
+# All ADMIN/finish actions remain in ver6-enrollment-api, which MUST require
+# an authenticated Supabase JWT, and must never be deployed as open access.
+[functions.ver6-enrollment-api]
+verify_jwt = true
