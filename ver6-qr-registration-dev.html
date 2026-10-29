@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>赤伝Ver.6｜QR対面登録 開発版</title>
+<script>
+/* Capture QR fragment before external SDK loads; fragments never reach HTTP server. */
+(function(){
+  try {
+    const fragment=new URLSearchParams(location.hash.slice(1));
+    const token=fragment.get('invite');
+    if(token && /^[a-f0-9]{64}$/.test(token)){
+      sessionStorage.setItem('akaden_qr_invite',token);
+      history.replaceState(null,'',location.pathname+location.search);
+    }
+  } catch { /* Do not expose QR tokens in logs */ }
+})();
+</script>
+<style>
+:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;background:#f3f7fb;color:#162d43}
+*{box-sizing:border-box}body{margin:0}header{background:#145fa8;color:white;padding:16px 18px;font-weight:750}
+main{max-width:780px;margin:auto;padding:18px 14px 60px}
+.card{background:#fff;border:1px solid #d7e3ef;border-radius:14px;padding:18px;margin-bottom:14px;box-shadow:0 1px 6px #243d5c0a}
+h1{font-size:1.25rem;margin:0}h2{font-size:1.1rem;margin:0 0 12px;color:#155ea5}
+p{margin:8px 0 14px}.hint{font-size:.88rem;color:#586c7d}
+.warn{background:#fff4df;border:1px solid #f3d6a2;border-radius:10px;padding:12px;margin-bottom:16px}
+.step{display:inline-block;background:#e6f1ff;color:#145fa8;padding:3px 9px;border-radius:20px;font-weight:700;font-size:.8rem}
+label{display:block;font-weight:650;margin:12px 0 6px}
+input,select{width:100%;padding:11px 12px;border:1px solid #a8bcd0;border-radius:9px;font:inherit;max-width:100%;background:white}
+input:focus,select:focus{outline:2px solid #90c3f7}
+button{border:0;border-radius:10px;background:#1468b6;color:white;cursor:pointer;font:inherit;font-weight:700;padding:11px 16px;min-height:44px}
+button:disabled{background:#a9b9c8;cursor:not-allowed}
+button.secondary{background:#e9f0f8;color:#164e85}
+button.danger{background:#b32635}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row>button{flex:0 0 auto}.tabs{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0 17px}
+.tabs button{background:#e7eff8;color:#205b8c}.tabs button.active{background:#1468b6;color:#fff}
+.hidden{display:none!important}#notice{font-weight:650;white-space:pre-wrap;overflow-wrap:anywhere;padding:11px;border-radius:10px;background:#ebf2fa;margin:12px 0}
+#notice[data-kind="error"]{background:#fff0f0;color:#9e232c}#notice[data-kind="success"]{background:#e9f5ed;color:#18653b}
+.code{font-size:2.3rem;font-weight:800;letter-spacing:.13em;text-align:center;padding:14px;background:#eff5fd;border-radius:12px}
+#qr{display:flex;justify-content:center;margin:16px 0}#qr img,#qr canvas{max-width:100%}
+.small{font-size:.82rem}#requestLabel{overflow-wrap:anywhere}#sessionInfo{overflow-wrap:anywhere}
+fieldset{border:1px solid #d7e3ef;border-radius:10px;padding:12px;margin:12px 0}legend{font-weight:700}
+footer{font-size:.81rem;color:#596979;padding-top:12px}
+@media(max-width:560px){.card{padding:15px}.row button{width:100%}.tabs button{font-size:.88rem;padding:10px 8px}}
+</style>
+</head>
+<body>
+<header><h1>赤伝管理システム Ver.6｜QR対面登録</h1></header>
+<main>
+<div class="warn"><strong>開発版：本番利用不可</strong>
+<p class="small">GitHubの開発ブランチにある試作品です。QR登録用サーバーは未配備で、登録操作はまだ利用できません。架空のスタッフだけで試験し、患者情報や秘密鍵は入力しないでください。</p></div>
+<section class="card">
+<h2>接続設定（試験専用）</h2>
+<label for="projectUrl">Supabase Project URL</label>
+<input id="projectUrl" type="url" placeholder="https://project.supabase.co" autocomplete="off">
+<label for="publicKey">公開用のpublishable / anonキー</label>
+<input id="publicKey" type="text" placeholder="sb_publishable_..." autocomplete="off" spellcheck="false">
+<div class="row" style="margin-top:12px"><button type="button" id="connect">Supabaseに接続</button><button type="button" class="secondary" id="signout" disabled>この端末でログアウト</button></div>
+<p class="hint" id="sessionInfo">未接続。service_roleキー、secretキーは絶対に入力しないでください。</p>
+</section>
+<div id="notice" role="status" aria-live="polite">管理者とスタッフが対面して登録します。</div>
+<div class="tabs" role="tablist">
+<button type="button" id="adminTab" role="tab" aria-selected="false" class="secondary">管理者</button>
+<button type="button" id="staffTab" role="tab" aria-selected="true" class="active">スタッフ</button>
+</div>
+<div id="staffView">
+<section class="card">
+<h2><span class="step">STEP 1</span> QRを読み取る</h2>
+<p id="qrStatus">QR未読取です。管理者から提示されたQRをスマートフォンのカメラで開いてください。</p>
+<p class="hint">QRは登録先の案内だけです。読み取っただけではログインできません。</p>
+</section>
+<section class="card">
+<h2><span class="step">STEP 2</span> メールで本人確認</h2>
+<label for="staffEmail">登録済みメールアドレス</label>
+<input type="email" id="staffEmail" placeholder="example@hospital.jp" autocomplete="email">
+<button type="button" id="sendOtp" disabled>認証コードをメール送信</button>
+<label for="staffOtp">メールで届いた認証コード</label>
+<input id="staffOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6桁のコード">
+<button type="button" id="verifyOtp" disabled>認証コードを確認</button>
+<p class="hint">Supabaseのメールテンプレートは、認証コード用の <code>{{ .Token }}</code> を含む設定が必要です。メールの受信確認ができない場合は登録を進められません。</p>
+</section>
+<section class="card">
+<h2><span class="step">STEP 3</span> 管理者に対面申請</h2>
+<button id="startRequest" disabled>この端末から登録申請を送る</button>
+<p class="hint">申請後、下の6桁の確認番号を、対面している管理者に伝えてください。QRに確認番号は含まれません。</p>
+<div id="staffCodeSection" class="hidden">
+<div class="code" id="staffCode">------</div>
+<p class="small">申請ID：<span id="requestLabel">—</span></p>
+</div>
+</section>
+<section class="card">
+<h2><span class="step">STEP 4</span> 承認後に登録を完了</h2>
+<p>管理者の画面で承認されたら、下のボタンを押してください。</p>
+<button id="finishRequest" disabled>承認を確認して端末登録を完了</button>
+<p class="hint" id="finishHelp">完了後は既存の赤伝Ver.6を開いて利用します。</p>
+<a id="openVer6" href="./ver6-preview.html" class="hidden">Ver.6試験ページを開く</a>
+</section>
+</div>
+<div id="adminView" class="hidden">
+<section class="card">
+<h2><span class="step">STEP 1</span> 管理者としてログイン</h2>
+<label for="adminEmail">管理者メールアドレス</label>
+<input id="adminEmail" type="email" placeholder="admin@example.jp" autocomplete="username">
+<label for="adminPassword">既存の管理者パスワード（移行期間のみ）</label>
+<input id="adminPassword" type="password" autocomplete="current-password">
+<button type="button" id="adminLogin" disabled>管理者ログイン</button>
+<p class="hint">このパスワードは保存しません。QR登録前に管理者端末の初期承認が必要です。</p>
+</section>
+<section class="card">
+<h2><span class="step">STEP 2</span> スタッフ用QR発行</h2>
+<label for="staffChoice">登録対象スタッフ</label>
+<select id="staffChoice"><option value="">管理者ログイン後に一覧を読み込みます</option></select>
+<button type="button" id="issueQr" disabled>10分間有効・1回限りのQRを発行</button>
+<div id="qr" role="img" aria-label="発行された登録用QRコード"></div>
+<p class="hint">QRの中身はブラウザ内だけで画像化します。QRのスクリーンショットやURLを共有しないでください。</p>
+</section>
+<section class="card">
+<h2><span class="step">STEP 3</span> 対面で申請を承認</h2>
+<button type="button" id="refreshPending" disabled class="secondary">承認待ちを更新</button>
+<label for="requestChoice">承認するスタッフ・申請</label>
+<select id="requestChoice"><option value="">未取得</option></select>
+<label for="approveCode">スタッフ端末に表示された6桁の確認番号</label>
+<input id="approveCode" maxlength="6" inputmode="numeric" autocomplete="off" placeholder="123456">
+<button type="button" id="approveRequest" disabled>本人を対面確認して承認</button>
+<p class="hint">対面している本人・スタッフ名・申請IDを確認してください。承認はサーバーで記録します。</p>
+</section>
+<section class="card">
+<h2><span class="step">STEP 4</span> 紛失・機種変更時の端末失効</h2>
+<button type="button" id="refreshDevices" disabled class="secondary">登録端末一覧を更新</button>
+<label for="deviceChoice">失効させる端末</label>
+<select id="deviceChoice"><option value="">未取得</option></select>
+<button type="button" id="revokeDevice" disabled class="danger">選択した旧端末を無効化</button>
+<p class="hint">旧端末の赤伝データへのアクセスをサーバー側で拒否します。ブラウザに保存済みの認証情報は自動消去できないため、別途Authセッションの管理も必要です。</p>
+</section>
+</div>
+<footer>試験専用。患者情報・実際の発注情報は入力しないでください。登録用QR、認証コード、ログイン情報をログ・分析サービスへ送信しません。</footer>
+</main>
+<script src="./vendor/qrcodejs/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const APP={client:null,base:'',key:'',tab:'staff',user:null};
+const show=(id,visible)=>$(id).classList.toggle('hidden',!visible);
+const note=(message,kind='info')=>{const n=$('notice');n.textContent=message;n.dataset.kind=kind;};
+const isHex64=x=>/^[a-f0-9]{64}$/.test(x);
+const apiEnabled=()=>!!APP.client&&location.protocol==='https:';
+const getProof=()=>({
+ request_id:sessionStorage.getItem('akaden_qr_request_id'),
+ browser_secret:sessionStorage.getItem('akaden_qr_browser_secret')
+});
+const fillSelect=(id,items,toOption)=>{
+ const el=$(id);el.replaceChildren();
+ const placeholder=document.createElement('option');
+ placeholder.value='';placeholder.textContent=items.length?'選択してください':'対象なし';
+ el.appendChild(placeholder);
+ for(const entry of items){
+  const opt=document.createElement('option');
+  const data=toOption(entry);opt.value=data.value;opt.textContent=data.label;
+  el.appendChild(opt);
+ }
+};
+const refreshButtons=()=>{
+ const online=!!APP.client;
+ ['sendOtp','verifyOtp','adminLogin'].forEach(id=>$(id).disabled=!online);
+ $('signout').disabled=!online;
+ $('startRequest').disabled=!online || !APP.user || !sessionStorage.getItem('akaden_qr_invite');
+ $('finishRequest').disabled=!online || !APP.user || !getProof().request_id;
+ const adminSession=online&&!!APP.user;
+ for(const id of ['issueQr','refreshPending','approveRequest','refreshDevices','revokeDevice'])
+  $(id).disabled=!adminSession;
+};
+const setTab=tab=>{
+ APP.tab=tab;
+ show('adminView',tab==='admin');show('staffView',tab==='staff');
+ $('adminTab').classList.toggle('active',tab==='admin');
+ $('staffTab').classList.toggle('active',tab==='staff');
+ $('adminTab').setAttribute('aria-selected',tab==='admin'?'true':'false');
+ $('staffTab').setAttribute('aria-selected',tab==='staff'?'true':'false');
+};
+const renderInvite=()=>{
+ const exists=isHex64(sessionStorage.getItem('akaden_qr_invite')||'');
+ $('qrStatus').textContent=exists
+   ?'有効形式のQRを読み込みました。メールで本人確認をしてください。'
+   :'QR未読取です。管理者のQRをスマートフォンで開いてください。';
+ if(exists)setTab('staff');
+};
+const decodeJwt=jwt=>{
+ try{
+  const chunk=jwt.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+  return JSON.parse(atob(chunk.padEnd(Math.ceil(chunk.length/4)*4,'=')));
+ }catch{return null}
+};
+const requireAuth=async()=>{
+ if(!APP.client)throw new Error('先に接続してください');
+ const {data:{session},error}=await APP.client.auth.getSession();
+ if(error||!session?.access_token)throw new Error('ログインが必要です');
+ return session.access_token;
+};
+const rpc=async(action,params={})=>{
+ const bearer=await requireAuth();
+ const response=await fetch(APP.base+'/functions/v1/ver6-enrollment-api',{
+  method:'POST',mode:'cors',cache:'no-store',referrerPolicy:'no-referrer',
+  headers:{'Content-Type':'application/json','Authorization':'Bearer '+bearer,'apikey':APP.key},
+  body:JSON.stringify({action,...params})
+ });
+ const json=await response.json();
+ if(!response.ok)throw new Error(json.error||'サーバーが処理を拒否しました');
+ return json;
+};
+const safe=async(fn)=>{
+ try{await fn()}catch(err){note(err?.message||'処理できませんでした','error')}
+ finally{refreshButtons()}
+};
+const randomHex=()=>{
+ const bytes=crypto.getRandomValues(new Uint8Array(32));
+ return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+};
+const confirmationCode=()=>{
+ const n=crypto.getRandomValues(new Uint32Array(1))[0]%1000000;
+ return String(n).padStart(6,'0');
+};
+const refreshIdentity=async()=>{
+ const {data,error}=await APP.client.auth.getUser();
+ APP.user=error?null:data.user;
+ $('sessionInfo').textContent=APP.user
+   ?'ログイン中：'+(APP.user.email||'アカウント')+'（端末の承認状態は別途確認）'
+   :'Supabaseに接続済み。ログインしてください。';
+ refreshButtons();
+};
+const connect=async()=>{
+ if(!window.supabase?.createClient)throw new Error('Supabase SDKを読み込めません');
+ const url=$('projectUrl').value.trim().replace(/\/$/,'');
+ const key=$('publicKey').value.trim();
+ const parsed=new URL(url);
+ if(parsed.protocol!=='https:'||!parsed.hostname.endsWith('.supabase.co'))
+  throw new Error('Supabaseの正しいhttps URLを入力してください');
+ if(!key || key.startsWith('sb_secret_') || /service_role/i.test(key))
+  throw new Error('公開用のpublishable / anonキーだけを入力してください');
+ if(key.startsWith('eyJ')){
+  const claims=decodeJwt(key);
+  if(claims?.role!=='anon')throw new Error('anonキー以外のJWTは入力しないでください');
+ }else if(!key.startsWith('sb_publishable_')){
+  throw new Error('公開用のキー形式を確認してください');
+ }
+ APP.base=url;APP.key=key;
+ APP.client=window.supabase.createClient(url,key,{
+  auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false,
+   storageKey:'akaden-qr-registration-auth'}
+ });
+ // No public key or private token is written to localStorage by our code.
+ await refreshIdentity();
+ note('接続しました。登録APIは本番未配備のため、QR登録の実操作はできません。','success');
+};
+const adminLogin=async()=>{
+ const email=$('adminEmail').value.trim();
+ const password=$('adminPassword').value;
+ if(!email||!password)throw new Error('管理者メールとパスワードを入力してください');
+ const {error}=await APP.client.auth.signInWithPassword({email,password});
+ $('adminPassword').value='';
+ if(error)throw error;
+ await refreshIdentity();
+ await loadStaff();
+ note('管理者ログインできました。QR発行APIは未配備です。','success');
+};
+const loadStaff=async()=>{
+ const {data,error}=await APP.client.from('profiles')
+  .select('user_id,display_name,role,active').eq('role','staff').eq('active',true)
+  .order('display_name');
+ if(error)throw new Error('スタッフ一覧を取得できません。管理者権限と端末承認を確認してください');
+ fillSelect('staffChoice',data||[],x=>({value:x.user_id,label:x.display_name}));
+};
+const issueQr=async()=>{
+ const userId=$('staffChoice').value;
+ if(!userId)throw new Error('対象スタッフを選択してください');
+ const data=await rpc('issue',{user_id:userId});
+ if(!isHex64(data.token))throw new Error('不正なQRトークン形式');
+ if(!window.QRCode)throw new Error('QRコード描画ライブラリを読み込めません');
+ const base=location.origin+location.pathname;
+ const url=base+'#invite='+data.token;
+ const qr=$('qr');qr.replaceChildren();
+ new window.QRCode(qr,{text:url,width:230,height:230,
+  correctLevel:window.QRCode.CorrectLevel.M});
+ note('QRを発行しました。期限：'+new Date(data.expires_at).toLocaleTimeString('ja-JP'),'success');
+};
+const sendOtp=async()=>{
+ const email=$('staffEmail').value.trim();
+ if(!email)throw new Error('メールアドレスを入力してください');
+ const {error}=await APP.client.auth.signInWithOtp({
+  email,options:{shouldCreateUser:false}
+ });
+ if(error)throw error;
+ note('認証用メールを送信しました。届いた6桁のコードを入力してください。','success');
+};
+const verifyOtp=async()=>{
+ const email=$('staffEmail').value.trim();
+ const code=$('staffOtp').value.trim();
+ if(!/^\d{6,8}$/.test(code))throw new Error('メールの認証コードを確認してください');
+ const {error}=await APP.client.auth.verifyOtp({email,token:code,type:'email'});
+ $('staffOtp').value='';
+ if(error)throw error;
+ await refreshIdentity();
+ note('メールでの本人確認に成功しました。管理者に対面申請を送ってください。','success');
+};
+const startRequest=async()=>{
+ const invite=sessionStorage.getItem('akaden_qr_invite')||'';
+ if(!isHex64(invite))throw new Error('登録用QRを読み取ってください');
+ const secret=randomHex(),code=confirmationCode();
+ const res=await rpc('start',{invite_token:invite,browser_secret:secret,
+  confirmation_code:code});
+ if(!res.request_id)throw new Error('申請IDが取得できません');
+ sessionStorage.setItem('akaden_qr_browser_secret',secret);
+ sessionStorage.setItem('akaden_qr_request_id',res.request_id);
+ sessionStorage.removeItem('akaden_qr_invite');
+ $('staffCode').textContent=code;
+ $('requestLabel').textContent=res.request_id;
+ show('staffCodeSection',true);
+ note('管理者の前で6桁の確認番号を提示してください。','success');
+};
+const finishRequest=async()=>{
+ const {request_id,browser_secret}=getProof();
+ if(!request_id||!isHex64(browser_secret||''))throw new Error('登録申請がありません');
+ const res=await rpc('finish',{request_id,browser_secret});
+ if(!res.enrolled)throw new Error('まだ承認されていないか、申請の期限が切れています');
+ sessionStorage.removeItem('akaden_qr_request_id');
+ sessionStorage.removeItem('akaden_qr_browser_secret');
+ $('staffCode').textContent='------';
+ show('staffCodeSection',false);
+ show('openVer6',true);
+ note('端末登録が完了しました。Ver.6試験ページを開けます。','success');
+};
+const pending=async()=>{
+ const res=await rpc('pending');
+ fillSelect('requestChoice',res.items||[],x=>({
+  value:x.request_id,label:(x.staff_name||'スタッフ')+'｜'+x.request_id.slice(0,8)+
+   '｜'+new Date(x.requested_at).toLocaleTimeString('ja-JP')
+ }));
+ note('承認待ちを更新しました。','success');
+};
+const approve=async()=>{
+ const id=$('requestChoice').value;
+ const code=$('approveCode').value.trim();
+ if(!id||!/^\d{6}$/.test(code))throw new Error('申請と6桁の確認番号を入力してください');
+ const res=await rpc('approve',{request_id:id,confirmation_code:code});
+ $('approveCode').value='';
+ if(!res.approved)throw new Error('確認番号が一致しないか、申請は無効です');
+ note('管理者による対面承認を記録しました。スタッフに完了ボタンを押してもらってください。','success');
+ await pending();
+};
+const devices=async()=>{
+ const res=await rpc('devices');
+ fillSelect('deviceChoice',(res.items||[]).filter(x=>!x.revoked_at),x=>({
+  value:x.session_id,label:(x.staff_name||'スタッフ')+
+   '｜'+x.session_id.slice(0,8)+'｜'+new Date(x.enrolled_at).toLocaleString('ja-JP')
+ }));
+ note('登録端末一覧を更新しました。','success');
+};
+const revoke=async()=>{
+ const id=$('deviceChoice').value;
+ if(!id)throw new Error('旧端末を選択してください');
+ if(!confirm('選択した端末の赤伝データへのアクセスを無効化しますか？'))return;
+ const res=await rpc('revoke',{session_id:id});
+ if(!res.revoked)throw new Error('すでに無効化されたか、対象が見つかりません');
+ note('旧端末の承認を無効化しました。','success');
+ await devices();
+};
+const bind=(id,fn)=>$(id).addEventListener('click',()=>safe(fn));
+bind('connect',connect);
+bind('signout',async()=>{if(APP.client)await APP.client.auth.signOut({scope:'local'});
+ APP.user=null;await refreshIdentity();note('この端末からログアウトしました。','success')});
+bind('adminLogin',adminLogin);bind('issueQr',issueQr);
+bind('sendOtp',sendOtp);bind('verifyOtp',verifyOtp);
+bind('startRequest',startRequest);bind('finishRequest',finishRequest);
+bind('refreshPending',pending);bind('approveRequest',approve);
+bind('refreshDevices',devices);bind('revokeDevice',revoke);
+$('adminTab').addEventListener('click',()=>setTab('admin'));
+$('staffTab').addEventListener('click',()=>setTab('staff'));
+renderInvite();
+refreshButtons();
+})();
+</script>
+</body>
+</html>
