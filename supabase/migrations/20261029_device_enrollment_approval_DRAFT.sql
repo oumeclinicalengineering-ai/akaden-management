@@ -125,41 +125,10 @@ REVOKE ALL ON FUNCTION public.approve_device_enrollment(uuid,text)
 GRANT EXECUTE ON FUNCTION public.approve_device_enrollment(uuid,text)
   TO authenticated;
 
--- Called by trusted Edge Function ONLY after approval. This is an atomic
--- single-use claim bound to the 256-bit secret held by the scanning browser.
--- The Edge Function must additionally use a supported Supabase Auth flow
--- and verify target user_id before enrolling any actual session_id.
-CREATE OR REPLACE FUNCTION public.claim_approved_device_enrollment(
-  p_request_id uuid,p_browser_secret_hash text
-) RETURNS TABLE (target_user_id uuid)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
-AS $body$
-BEGIN
-  IF current_setting('request.jwt.claim.role',true) IS DISTINCT FROM 'service_role' THEN
-    RAISE EXCEPTION 'server only' USING ERRCODE='42501';
-  END IF;
-  IF p_request_id IS NULL OR p_browser_secret_hash IS NULL
-     OR p_browser_secret_hash !~ '^[a-f0-9]{64}$' THEN
-    RETURN;
-  END IF;
-  -- Atomic claim: the actor is a trusted server, not a browser user.
-  RETURN QUERY
-   UPDATE app_private.device_enrollment_requests r
-      SET consumed_at=now()
-    WHERE r.id=p_request_id AND r.browser_secret_hash=p_browser_secret_hash
-      AND r.approved_at IS NOT NULL AND r.consumed_at IS NULL
-      AND r.expires_at>now()
-   RETURNING r.user_id;
-  IF FOUND THEN
-    INSERT INTO app_private.device_enrollment_audit(request_id,event_type)
-      VALUES(p_request_id,'CLAIMED');
-  END IF;
-END;
-$body$;
-REVOKE ALL ON FUNCTION public.claim_approved_device_enrollment(uuid,text)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.claim_approved_device_enrollment(uuid,text)
-  TO service_role;
+-- Approved requests are consumed ONLY by finalize_approved_device_enrollment,
+-- which atomically verifies auth.sessions and inserts the approved device.
+-- Never expose a separate claim-only API that could leave a consumed request
+-- without a registered session.
 COMMIT;
 
 -- Still to be implemented in Edge Functions:
