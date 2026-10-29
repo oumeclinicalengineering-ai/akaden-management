@@ -17,7 +17,7 @@ VALUES
  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',repeat('d',64),
   'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',now()+interval '10 minutes');
 
-CREATE TEMP TABLE test_request (id uuid PRIMARY KEY);
+CREATE TEMP TABLE test_request (id uuid PRIMARY KEY);\nGRANT SELECT ON test_request TO authenticated;
 INSERT INTO test_request
 SELECT public.start_device_enrollment(repeat('a',64),repeat('b',64),repeat('c',64));
 
@@ -92,7 +92,7 @@ BEGIN
 END $$;
 
 -- An incorrect code may be attempted at most 5 times.
-CREATE TEMP TABLE locked_request(id uuid PRIMARY KEY);
+CREATE TEMP TABLE locked_request(id uuid PRIMARY KEY);\nGRANT SELECT ON locked_request TO authenticated;
 INSERT INTO locked_request
 SELECT public.start_device_enrollment(repeat('d',64),repeat('a',64),repeat('b',64));
 SET request.jwt.claim.role='authenticated';
