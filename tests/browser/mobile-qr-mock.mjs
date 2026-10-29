@@ -175,7 +175,8 @@ try{
    await admin.locator('#deviceChoice').selectOption(SESSION);
    admin.once('dialog',d=>d.accept());
    await admin.locator('#revokeDevice').click();
-   await admin.waitForFunction(()=>document.querySelector('#notice').textContent.includes('旧端末の承認を無効化'));\n   assert.equal(config.deviceRevoked,true);
+   await admin.waitForFunction(()=>document.querySelector('#notice').textContent.includes('旧端末の承認を無効化'));
+   assert.equal(config.deviceRevoked,true);
 
    const pageWidth=await staff.evaluate(()=>({
      viewport:window.innerWidth,
