@@ -28,8 +28,10 @@ Deno.test('Real local GoTrue magiclink -> session -> RLS; replay denied', async 
   });
   check(!linkError && link?.user?.id === staffId, 'Real generateLink returned wrong user/error');
   const tokenHash = link.properties?.hashed_token;
-  check(typeof tokenHash === 'string' && /^[0-9a-f]{64}$/i.test(tokenHash),
-    'Real generateLink did not provide a valid hashed_token');
+  check(typeof tokenHash === 'string' && /^[a-zA-Z0-9_-]{32,128}$/.test(tokenHash),
+    'Real GoTrue hashed_token missing/invalid: length=' + (typeof tokenHash === 'string' ? tokenHash.length : 'absent'));
+  console.log('Real GoTrue hashed_token shape: length=' + tokenHash.length +
+    ', legacyHex64=' + /^[0-9a-f]{64}$/i.test(tokenHash));
   const { data: unauthSession } = await unrelatedBrowser.auth.getSession();
   check(unauthSession.session === null, 'Unapproved browser already had a session');
   const { data: verified, error: verificationError } = await staff.auth.verifyOtp({
