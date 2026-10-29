@@ -46,6 +46,8 @@ jobs:
       - name: Assert quantity guard, roles and triggers
         run: psql -X -v ON_ERROR_STOP=1 -f tests/postgres/ver6_core_assertions.sql
       - name: Assert live contract quantity bounds in synthetic schema
+        run: psql -X -v ON_ERROR_STOP=1 -f tests/postgres/ver6_core_role_assertions.sql
+      - name: Assert live contract quantity bounds in synthetic schema
         run: psql -X -v ON_ERROR_STOP=1 -f tests/postgres/ver6_core_contract_assertions.sql
       - name: Initialize synthetic receipt operations
         run: psql -X -v ON_ERROR_STOP=1 -f tests/postgres/ver6_core_receipts_fixture.sql
