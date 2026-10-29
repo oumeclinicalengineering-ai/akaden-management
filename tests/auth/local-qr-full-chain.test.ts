@@ -4,7 +4,12 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.5
 import { handleFaceToFaceRequest } from '../../supabase/functions/ver6-face-to-face-enrollment/index.ts';
 import { handleEnrollmentRequest } from '../../supabase/functions/ver6-enrollment-api/index.ts';
 function check(value: unknown, message: string): asserts value {
-  if (!value) throw new Error(message);
+  if (!value) {
+    // Messages are fixed assertions, never SQL, credentials or remote responses.
+    // Expose the failed invariant in public CI annotations without requiring logs.
+    console.error('::error title=QR full-chain assertion::' + message);
+    throw new Error(message);
+  }
 }
 const idPattern = /^[0-9a-f-]{36}$/;
 const hex = () => Array.from(crypto.getRandomValues(new Uint8Array(32)), n => n.toString(16).padStart(2, '0')).join('');

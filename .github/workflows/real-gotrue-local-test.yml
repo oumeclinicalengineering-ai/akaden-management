@@ -41,7 +41,11 @@ jobs:
       - name: Start real GoTrue/Auth and PostgreSQL locally (Docker only)
         run: |
           set -eu
-          npx --yes supabase@2.122.0 --workdir "$RUNNER_TEMP/akaden-ver6-real-auth" start --exclude studio,postgres-meta,realtime,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor
+          # CLI startup summaries contain disposable keys: keep them out of logs.
+          if ! npx --yes supabase@2.122.0 --workdir "$RUNNER_TEMP/akaden-ver6-real-auth" start --exclude studio,postgres-meta,realtime,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor > "$RUNNER_TEMP/akaden-local-start.log" 2>&1; then
+            echo 'Disposable local Supabase startup failed (credential-bearing output withheld).'
+            exit 1
+          fi
       - name: Read ONLY the disposable local connection parameters
         run: |
           set -eu
@@ -51,6 +55,9 @@ jobs:
             value="$(grep -m1 "^$1=" "$RUNNER_TEMP/akaden-local-status.env" | cut -d= -f2-)"
             value="$(printf '%s' "$value" | tr -d '"')"
             test -n "$value"
+            case "$2" in
+              LOCAL_ANON_KEY|LOCAL_SERVICE_ROLE_KEY|LOCAL_DB_URL) printf '::add-mask::%s\n' "$value" ;;
+            esac
             printf '%s=%s\n' "$2" "$value" >> "$GITHUB_ENV"
           done
           rm -f "$RUNNER_TEMP/akaden-local-status.env"
@@ -105,3 +112,4 @@ jobs:
         run: |
           npx --yes supabase@2.122.0 --workdir "$RUNNER_TEMP/akaden-ver6-real-auth" stop --no-backup || true
           rm -f "$RUNNER_TEMP/akaden-real-auth-ids.txt"
+          rm -f "$RUNNER_TEMP/akaden-local-start.log" "$RUNNER_TEMP/akaden-local-status.env"
