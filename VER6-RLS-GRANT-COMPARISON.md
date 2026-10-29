@@ -31,6 +31,8 @@
 
 Node動作テスト18件、静的・模擬共有試験、既存SQL契約/競合試験を維持します。追加4項目はGitHub Actionsの使い捨てDBで実行します。失敗があれば結果を確認して修正します。
 
+コードコミット `7a07bbe` の結果: Node18件成功・0失敗、静的チェック・ローカル模擬共有試験成功。PostgreSQLの追加4項目・既存数量境界5項目・競合6シナリオ・既存SQL検査は[PR側CI](https://github.com/oumeclinicalengineering-ai/akaden-management/actions/runs/40861269182)と[push側CI](https://github.com/oumeclinicalengineering-ai/akaden-management/actions/runs/40861260541)で成功。Node/静的CIもPR側40861269178・push側40861260455で成功。最終実行に失敗はありません。実認証3区分の検証は未実施です。
+
 ## 次の作業
 
 レビュー済み完全定義が揃えば、PR #3のローカルAuth起動・秘密ログ抑制・削除を再利用し、実JWTでスタッフ/管理者/無効利用者と業務RPCを確認します。それまでは本番への接続・SQL適用やローカル権限の推測再現をしません。PR #4はDraftを維持します。
