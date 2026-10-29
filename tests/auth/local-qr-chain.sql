@@ -29,3 +29,27 @@ BEGIN
  OR has_function_privilege('authenticated','public.finalize_approved_device_enrollment(uuid,text,uuid,uuid)','EXECUTE')
  THEN RAISE EXCEPTION 'Privileged enrollment RPC exposed'; END IF;
 END $$;
+
+-- Authorization regression: untrusted roles must never be able to claim
+-- a signed-in credential or register an approved session.
+DO $security$
+DECLARE
+  v_blocked boolean;
+BEGIN
+  v_blocked := NOT has_function_privilege('anon',
+    'public.claim_approved_face_to_face_auth(uuid,text)','EXECUTE');
+  IF NOT v_blocked THEN RAISE EXCEPTION 'anon can claim Auth credential'; END IF;
+  IF has_function_privilege('authenticated',
+    'public.claim_approved_face_to_face_auth(uuid,text)','EXECUTE')
+  THEN RAISE EXCEPTION 'authenticated can claim Auth credential'; END IF;
+  IF has_function_privilege('anon',
+    'public.finalize_approved_device_enrollment(uuid,text,uuid,uuid)','EXECUTE')
+  THEN RAISE EXCEPTION 'anon can register device'; END IF;
+  IF has_function_privilege('authenticated',
+    'public.finalize_approved_device_enrollment(uuid,text,uuid,uuid)','EXECUTE')
+  THEN RAISE EXCEPTION 'authenticated can register device'; END IF;
+  IF has_table_privilege('anon','app_private.approved_device_sessions','SELECT')
+    OR has_table_privilege('authenticated','app_private.device_enrollment_requests','SELECT')
+  THEN RAISE EXCEPTION 'private enrollment data exposed'; END IF;
+  RAISE NOTICE 'PASS: enrollment credentials and device allowlist cannot be read or mutated by client roles';
+END $security$;
