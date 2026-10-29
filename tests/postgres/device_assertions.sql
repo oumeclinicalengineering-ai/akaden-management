@@ -67,24 +67,24 @@ RESET ROLE;
 UPDATE auth.sessions SET not_after=now()-interval '1 minute'
  WHERE id='bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
 SET ROLE authenticated;
-DO $
+DO $$
 BEGIN
  IF public.is_active_user() OR (SELECT count(*) FROM public.orders)<>0 THEN
    RAISE EXCEPTION 'expired GoTrue session retained DB access';
  END IF;
-END $;
+END $$;
 RESET ROLE;
 UPDATE auth.sessions SET not_after=NULL
  WHERE id='bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
 DELETE FROM auth.sessions
  WHERE id='bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
 SET ROLE authenticated;
-DO $
+DO $$
 BEGIN
  IF public.is_active_user() OR (SELECT count(*) FROM public.orders)<>0 THEN
   RAISE EXCEPTION 'signed-out GoTrue session retained DB access';
  END IF;
-END $;
+END $$;
 RESET ROLE;
 INSERT INTO auth.sessions(id,user_id)
  VALUES('bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb',
