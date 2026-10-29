@@ -5,9 +5,9 @@
 ## 現状
 - 実GoTrueの `generateLink → verifyOtp → getUser → auth.sessions` はGitHub Actionsで成功済み。
 - QR承認、端末登録、失効は従来の模擬/隔離テストで検証済み。
-- **両者を本番相当のSQL/RPCで通した結合テストは未実施。**
+- `tests/auth/local-qr-full-chain.test.ts` に実ハンドラー・実GoTrue・DRAFT RPCを接続した全工程テストを実装。軽量ローカル隔離環境で1件成功・0件失敗。Supabase CLI通常構成のActions結果と検証範囲は [実GoTrue結合試験記録](VER6_LOCAL_GOTRUE_INTEGRATION_20261029.md) を参照。
 
-## 次のCIの構成
+## 実装したCIの構成
 1. GitHub標準Ubuntuランナーで使い捨てのSupabase CLIローカル環境を起動。接続先はlocalhostのみ許可。実スタッフ、患者データ、SMTP、クラウドのSupabaseプロジェクトを使用しない。
 2. DRAFT SQLの依存関係（profiles、is_admin、invites、approved_device_sessions、requests、claim、finalize、rate budget）を確認し、ローカルに限って適用する。既存本番migrationを自動適用しない。
 3. 架空の管理者とスタッフをローカルGoTrueに作成。管理者の正式Authセッションを登録済み端末としてテスト用にbootstrapする。
