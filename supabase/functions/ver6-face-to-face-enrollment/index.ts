@@ -17,9 +17,23 @@ const field=(obj:Body,k:string):string=>typeof obj[k]==='string'?obj[k] as strin
 
 // The exported handler allows isolated HTTP tests with a mock Supabase
 // client. In normal Edge deployment import.meta.main is true and serves HTTP.
-export type FaceToFaceDependencies = {
+// Narrow ports keep the test seam type-safe without requiring generated
+// Supabase Database types for security-definer RPCs staged on this branch.
+type RpcResult={data:unknown;error:unknown};
+type StaffUser={id:string;email?:string|null};
+export type FaceToFaceClient={
+  rpc:(name:string,params:Record<string,string>)=>Promise<RpcResult>;
+  auth:{admin:{
+    getUserById:(id:string)=>Promise<{data:{user:StaffUser|null};error:unknown}>;
+    generateLink:(opts:{type:'magiclink';email:string})=>Promise<{
+      data:{user:{id:string}|null;properties:{hashed_token?:string}|null}|null;
+      error:unknown
+    }>;
+  }};
+};
+export type FaceToFaceDependencies={
   env?: (name:string)=>string|undefined;
-  client?: ReturnType<typeof createClient>;
+  client?: FaceToFaceClient;
 };
 export const handleFaceToFaceRequest=async (
   request:Request,deps:FaceToFaceDependencies={}
@@ -59,9 +73,10 @@ export const handleFaceToFaceRequest=async (
       return reply(400,{error:'Invalid input'});
     body=value as Body;
   }catch{return reply(400,{error:'Invalid JSON'})}
-  const client=deps.client ?? createClient(url,serviceKey,{
-    auth:{persistSession:false,autoRefreshToken:false}
-  });
+  const client:FaceToFaceClient=deps.client ??
+    createClient(url,serviceKey,{
+      auth:{persistSession:false,autoRefreshToken:false}
+    }) as unknown as FaceToFaceClient;
   // Persistent, transactional Postgres budgets. The platform's Auth rate
   // limits do not automatically protect this anonymous Edge Function.
   // Any DB error FAILS CLOSED. Do not use an in-memory per-isolate counter.
