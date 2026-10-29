@@ -23,7 +23,7 @@ CREATE OR REPLACE FUNCTION public.claim_approved_face_to_face_auth(
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
 AS $body$
 BEGIN
-  IF current_setting('request.jwt.claim.role', true) IS DISTINCT FROM 'service_role' THEN
+  IF auth.role() IS DISTINCT FROM 'service_role' THEN
     RAISE EXCEPTION 'server only' USING ERRCODE = '42501';
   END IF;
   IF p_request_id IS NULL OR p_browser_secret_hash IS NULL

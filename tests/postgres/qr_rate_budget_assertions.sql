@@ -1,6 +1,8 @@
 -- Tests run ONLY in temporary PostgreSQL. Prior script creates rate_request.
 -- Counters are persistent per operation and per REAL reference. No raw QR stored.
-SET request.jwt.claim.role='service_role';
+-- Regression: modern PostgREST sets JSON claims, NOT the legacy singular GUC.
+SET request.jwt.claim.role='';
+SET request.jwt.claims='{"role":"service_role"}';
 -- Each psql -f runs in its own connection: create local fake references here.
 INSERT INTO public.device_enrollment_invites
   (user_id,token_hash,issued_by,expires_at)
@@ -89,3 +91,32 @@ END;
 $body$;
 
 SELECT 'PASS: rate budget caps, window reset, no unknown-reference table growth, private RPC' AS result;
+
+-- These service-only transitions must recognize the same modern JSON claim.
+-- A missing request must return no result/false rather than 'server only'.
+DO $modern_claims$
+BEGIN
+ IF auth.role() IS DISTINCT FROM 'service_role' THEN
+   RAISE EXCEPTION 'JSON role not recognized';
+ END IF;
+ IF EXISTS (SELECT 1 FROM public.claim_approved_face_to_face_auth(
+   '00000000-0000-4000-8000-000000000000',repeat('a',64))) THEN
+   RAISE EXCEPTION 'unknown request claimed';
+ END IF;
+ IF public.finalize_approved_device_enrollment(
+   '00000000-0000-4000-8000-000000000000',repeat('a',64),
+   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+   '00000000-0000-4000-8000-000000000001') THEN
+   RAISE EXCEPTION 'unknown request finalized';
+ END IF;
+ -- GRANT checks remain primary; defense-in-depth rejects a wrong JSON role
+ -- even when called as the test superuser.
+ PERFORM set_config('request.jwt.claims','{"role":"authenticated"}',true);
+ BEGIN
+   PERFORM public.consume_qr_enrollment_rate_budget('start',repeat('a',64));
+   RAISE EXCEPTION 'non-service JSON role accepted';
+ EXCEPTION WHEN insufficient_privilege THEN NULL;
+ END;
+END;
+$modern_claims$;
+SELECT 'PASS: service RPCs support JSON claims and reject non-service JSON roles' AS result;

@@ -47,7 +47,7 @@ DECLARE
   v_user_id uuid;
   v_expires_at timestamptz;
 BEGIN
-  IF current_setting('request.jwt.claim.role',true) IS DISTINCT FROM 'service_role' THEN
+  IF auth.role() IS DISTINCT FROM 'service_role' THEN
     RAISE EXCEPTION 'server only' USING ERRCODE='42501';
   END IF;
   IF p_invite_hash !~ '^[a-f0-9]{64}$'

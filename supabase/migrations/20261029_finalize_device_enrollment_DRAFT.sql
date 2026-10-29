@@ -14,7 +14,7 @@ AS $body$
 DECLARE
   v_req app_private.device_enrollment_requests%rowtype;
 BEGIN
-  IF current_setting('request.jwt.claim.role', true) IS DISTINCT FROM 'service_role' THEN
+  IF auth.role() IS DISTINCT FROM 'service_role' THEN
     RAISE EXCEPTION 'server only' USING ERRCODE='42501';
   END IF;
   IF p_request_id IS NULL OR p_user_id IS NULL OR p_session_id IS NULL
@@ -30,6 +30,14 @@ BEGIN
     OR v_req.expires_at <= now()
     OR v_req.browser_secret_hash <> p_browser_secret_hash THEN
     RETURN false;
+  END IF;
+  -- Recheck account status at the state transition, not just at the Edge
+  -- request/credential-claim boundary. An account may have been disabled or
+  -- changed role after approval; that must not create a newly trusted device.
+  IF NOT EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE user_id = p_user_id AND active IS TRUE AND role = 'staff'
+  ) THEN RETURN false;
   END IF;
   -- Database-side defense: session_id MUST exist and belong to the user.
   IF NOT EXISTS (

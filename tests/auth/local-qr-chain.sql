@@ -17,6 +17,7 @@ COMMIT;
 \ir ../../supabase/migrations/20261029_device_enrollment_approval_DRAFT.sql
 \ir ../../supabase/migrations/20261029_face_to_face_auth_claim_DRAFT.sql
 \ir ../../supabase/migrations/20261029_finalize_device_enrollment_DRAFT.sql
+\ir ../../supabase/migrations/20261029_qr_abuse_rate_budgets_DRAFT.sql
 -- Prove expected DRAFT functions exist, with restricted grants.
 DO $$
 BEGIN
@@ -53,3 +54,16 @@ BEGIN
   THEN RAISE EXCEPTION 'private enrollment data exposed'; END IF;
   RAISE NOTICE 'PASS: enrollment credentials and device allowlist cannot be read or mutated by client roles';
 END $security$;
+
+-- Device-aware test RLS uses the actual session predicate, not just JWT presence.
+CREATE TABLE public.akaden_local_device_rls_probe (
+ owner_id uuid PRIMARY KEY REFERENCES auth.users(id)
+);
+ALTER TABLE public.akaden_local_device_rls_probe ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.akaden_local_device_rls_probe FROM PUBLIC,anon,authenticated;
+GRANT SELECT ON public.akaden_local_device_rls_probe TO authenticated;
+CREATE POLICY approved_local_device ON public.akaden_local_device_rls_probe
+ FOR SELECT TO authenticated USING (
+ owner_id=(SELECT auth.uid()) AND (SELECT app_private.has_approved_device_session())
+ );
+NOTIFY pgrst, 'reload schema';

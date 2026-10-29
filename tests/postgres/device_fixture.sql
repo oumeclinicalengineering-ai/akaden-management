@@ -11,6 +11,14 @@ AS $body$
 SELECT COALESCE(NULLIF(current_setting('request.jwt.claims',true),'')::jsonb,'{}'::jsonb)
 $body$;
 
+-- Match GoTrue's helper: modern PostgREST provides the JSON claims object;
+-- old synthetic tests retain the legacy single-claim setting.
+CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql STABLE
+AS $body$
+SELECT COALESCE(NULLIF(current_setting('request.jwt.claim.role',true),''),
+  NULLIF(current_setting('request.jwt.claims',true),'')::jsonb ->> 'role')
+$body$;
+
 CREATE ROLE service_role NOLOGIN;
 GRANT USAGE ON SCHEMA public, auth TO authenticated, anon, service_role;
 GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated, anon;

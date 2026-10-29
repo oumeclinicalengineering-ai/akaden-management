@@ -68,7 +68,7 @@ CREATE OR REPLACE FUNCTION public.register_approved_device_session(
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''
 AS $body$
 BEGIN
-  IF current_setting('request.jwt.claim.role', true) IS DISTINCT FROM 'service_role' THEN
+  IF auth.role() IS DISTINCT FROM 'service_role' THEN
     RAISE EXCEPTION 'server only' USING ERRCODE='42501';
   END IF;
   IF p_session_id IS NULL OR p_user_id IS NULL OR p_approver IS NULL THEN

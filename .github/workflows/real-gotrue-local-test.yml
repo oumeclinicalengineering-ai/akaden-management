@@ -4,10 +4,16 @@ on:
     branches: [feature/ver6-qr-enrollment-design]
     paths:
       - 'tests/auth/**'
+      - 'supabase/migrations/**'
+      - 'supabase/functions/ver6-face-to-face-enrollment/**'
+      - 'supabase/functions/ver6-enrollment-api/**'
       - '.github/workflows/real-gotrue-local-test.yml'
   pull_request:
     paths:
       - 'tests/auth/**'
+      - 'supabase/migrations/**'
+      - 'supabase/functions/ver6-face-to-face-enrollment/**'
+      - 'supabase/functions/ver6-enrollment-api/**'
       - '.github/workflows/real-gotrue-local-test.yml'
   workflow_dispatch:
 permissions:
@@ -89,21 +95,11 @@ jobs:
           )"
           test "$count" = "1"
           echo 'PASS: Real GoTrue auth.sessions row belongs to the verified user.'
-      - name: Bind verified real Auth session to staged QR enrollment RPCs
+      - name: Real manager six-digit approval, QR Auth, device enrollment and rejection cases
         run: |
           set -eu
-          case "$LOCAL_DB_URL" in
-            postgresql://*@127.0.0.1:54322/*|postgres://*@127.0.0.1:54322/*) ;;
-            *) echo 'REFUSED: non-local database'; exit 1 ;;
-          esac
-          ids="$RUNNER_TEMP/akaden-real-auth-ids.txt"
-          uid="$(sed -n '1p' "$ids")"
-          sid="$(sed -n '2p' "$ids")"
-          printf '%s' "$uid" | grep -Eq '^[0-9a-f-]{36}$'
-          printf '%s' "$sid" | grep -Eq '^[0-9a-f-]{36}$'
-          psql "$LOCAL_DB_URL" -X -v ON_ERROR_STOP=1 \
-            -v staff_uid="$uid" -v session_id="$sid" \
-            -f tests/auth/local-qr-real-session.test.sql
+          deno test --allow-env=LOCAL_API_URL,LOCAL_ANON_KEY,LOCAL_SERVICE_ROLE_KEY,LOCAL_DB_URL \
+            --allow-net=127.0.0.1:54321 --allow-run=psql tests/auth/local-qr-full-chain.test.ts
       - name: Destroy disposable stack, even after failure
         if: always()
         run: |

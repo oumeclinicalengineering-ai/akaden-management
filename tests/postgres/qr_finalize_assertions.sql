@@ -87,6 +87,22 @@ BEGIN
  IF public.finalize_approved_device_enrollment(v_req,repeat('f',64),
    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','bbbbbbbb-6666-4666-8666-bbbbbbbbbbbb')
  THEN RAISE EXCEPTION 'nonexistent session accepted'; END IF;
+ -- Account status can change after approval / Auth credential issuance.
+ UPDATE public.profiles SET active=false
+ WHERE user_id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+ IF public.finalize_approved_device_enrollment(v_req,repeat('f',64),
+   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','bbbbbbbb-4444-4444-8444-bbbbbbbbbbbb')
+ THEN RAISE EXCEPTION 'inactive target enrolled a new device'; END IF;
+ UPDATE public.profiles SET active=true,role='admin'
+ WHERE user_id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+ IF public.finalize_approved_device_enrollment(v_req,repeat('f',64),
+   'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','bbbbbbbb-4444-4444-8444-bbbbbbbbbbbb')
+ THEN RAISE EXCEPTION 'staff invitation enrolled a changed admin account'; END IF;
+ UPDATE public.profiles SET role='staff'
+ WHERE user_id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+ IF EXISTS (SELECT 1 FROM app_private.device_enrollment_requests
+   WHERE id=v_req AND consumed_at IS NOT NULL)
+ THEN RAISE EXCEPTION 'rejected account consumed enrollment request'; END IF;
  IF NOT public.finalize_approved_device_enrollment(v_req,repeat('f',64),
    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','bbbbbbbb-4444-4444-8444-bbbbbbbbbbbb')
  THEN RAISE EXCEPTION 'valid approval and session failed to enroll'; END IF;

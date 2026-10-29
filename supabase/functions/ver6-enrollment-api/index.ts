@@ -25,9 +25,14 @@ const jwtClaims=(jwt:string):JsonObject|null=>{
   } catch {return null}
 };
 
-Deno.serve(async req=>{
+// Importable for isolated tests against disposable local Auth/PostgREST.
+export type EnrollmentDependencies={env?:(name:string)=>string|undefined};
+export const handleEnrollmentRequest=async (
+  req:Request,deps:EnrollmentDependencies={}
+):Promise<Response>=>{
+  const env=deps.env ?? ((name:string)=>Deno.env.get(name));
   const origin=req.headers.get('origin') || '';
-  const allowed=Deno.env.get('QR_ALLOWED_ORIGIN') || '';
+  const allowed=env('QR_ALLOWED_ORIGIN') || '';
   const cors:Record<string,string>={
     'Content-Type':'application/json; charset=utf-8',
     'Cache-Control':'no-store',
@@ -46,13 +51,13 @@ Deno.serve(async req=>{
 
   if(req.method==='OPTIONS')return new Response(null,{status:204,headers:cors});
   if(req.method!=='POST')return respond(405,{error:'POST required'});
-  if(Deno.env.get('QR_ENROLLMENT_ENABLED')!=='true')
+  if(env('QR_ENROLLMENT_ENABLED')!=='true')
     return respond(503,{error:'QR enrollment is disabled until staging validation'});
 
-  const url=Deno.env.get('SUPABASE_URL') || '';
-  const publicKey=Deno.env.get('SUPABASE_PUBLISHABLE_KEY')
-    || Deno.env.get('SUPABASE_ANON_KEY') || '';
-  const secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+  const url=env('SUPABASE_URL') || '';
+  const publicKey=env('SUPABASE_PUBLISHABLE_KEY')
+    || env('SUPABASE_ANON_KEY') || '';
+  const secret=env('SUPABASE_SERVICE_ROLE_KEY') || '';
   if(!url || !publicKey || !secret)return respond(503,{error:'Server is not configured'});
 
   const authHeader=req.headers.get('authorization') || '';
@@ -191,4 +196,7 @@ Deno.serve(async req=>{
     // Never print Authorization, raw QR token, browser proof or OTP to logs.
     return respond(500,{error:'Unexpected enrollment service error'});
   }
-});
+};
+if(import.meta.main){
+  Deno.serve(req=>handleEnrollmentRequest(req));
+}

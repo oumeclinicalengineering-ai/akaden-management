@@ -46,7 +46,7 @@ assert.ok(page.includes('shouldCreateUser:false'),'email Auth must not create ac
 
 for(const action of ['issue','start','pending','approve','finish','revoke','devices'])
  assert.ok(api.includes("action==='"+action+"'"),'API action missing: '+action);
-assert.ok(api.includes("Deno.env.get('QR_ENROLLMENT_ENABLED')!=='true'"),
+assert.ok(api.includes("env('QR_ENROLLMENT_ENABLED')!=='true'"),
  'API must stay disabled until explicitly enabled');
 assert.ok(api.includes('auth.auth.getUser(jwt)'),'every API action requires verified JWT');
 assert.ok(api.includes("claims?.sub!==user.id"),'JWT/session ownership cross-check required');

@@ -9,7 +9,7 @@ security definer
 set search_path = ''
 as $$
 begin
-  if current_setting('request.jwt.claim.role', true) is distinct from 'service_role' then
+  if auth.role() is distinct from 'service_role' then
     raise exception 'server-only operation' using errcode='42501';
   end if;
   if p_token_hash is null or p_token_hash !~ '^[a-f0-9]{64}$' then
