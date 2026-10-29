@@ -6,6 +6,9 @@ on:
       - 'ver6-qr-registration-dev.html'
       - 'vendor/qrcodejs/**'
       - 'supabase/functions/ver6-enrollment-api/**'
+      - 'supabase/functions/ver6-face-to-face-enrollment/**'
+      - 'supabase/config.toml'
+      - 'supabase/migrations/20261029_face_to_face_auth_claim_DRAFT.sql'
       - 'supabase/migrations/20261029_finalize_device_enrollment_DRAFT.sql'
       - 'supabase/migrations/20261029_enrollment_admin_views_DRAFT.sql'
       - 'supabase/migrations/20261029_admin_bootstrap_DRAFT.sql'
@@ -18,6 +21,9 @@ on:
       - 'ver6-qr-registration-dev.html'
       - 'vendor/qrcodejs/**'
       - 'supabase/functions/ver6-enrollment-api/**'
+      - 'supabase/functions/ver6-face-to-face-enrollment/**'
+      - 'supabase/config.toml'
+      - 'supabase/migrations/20261029_face_to_face_auth_claim_DRAFT.sql'
       - 'scripts/check-qr-ui.mjs'
       - '.github/workflows/qr-browser-check.yml'
 permissions:
@@ -37,4 +43,6 @@ jobs:
         with:
           deno-version: 'v2.x'
       - name: Type-check staged Supabase Edge Function
-        run: deno check supabase/functions/ver6-enrollment-api/index.ts
+        run: |
+          deno check supabase/functions/ver6-enrollment-api/index.ts
+          deno check supabase/functions/ver6-face-to-face-enrollment/index.ts
