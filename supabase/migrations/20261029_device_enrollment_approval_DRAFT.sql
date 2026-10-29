@@ -18,6 +18,16 @@ CREATE TABLE IF NOT EXISTS app_private.device_enrollment_requests (
   consumed_at timestamptz,
   CHECK ((approved_at IS NULL) = (approved_by IS NULL))
 );
+CREATE TABLE IF NOT EXISTS app_private.device_enrollment_audit (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  request_id uuid NOT NULL REFERENCES app_private.device_enrollment_requests(id),
+  event_type text NOT NULL CHECK(event_type IN ('REQUESTED','APPROVED','CLAIMED')),
+  actor_id uuid REFERENCES auth.users(id),
+  occurred_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE app_private.device_enrollment_audit ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON app_private.device_enrollment_audit FROM PUBLIC, anon, authenticated;
+
 ALTER TABLE app_private.device_enrollment_requests ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON app_private.device_enrollment_requests FROM PUBLIC, anon, authenticated;
 CREATE INDEX IF NOT EXISTS device_enrollment_requests_target_idx
@@ -63,6 +73,8 @@ BEGIN
   VALUES(v_invite_id,v_user_id,p_browser_secret_hash,p_confirmation_code_hash,
     LEAST(v_expires_at,now()+interval '10 minutes'))
   RETURNING id INTO v_id;
+  INSERT INTO app_private.device_enrollment_audit(request_id,event_type)
+    VALUES(v_id,'REQUESTED');
   RETURN v_id;
 END;
 $body$;
@@ -94,7 +106,11 @@ BEGIN
     AND approved_at IS NULL AND consumed_at IS NULL AND expires_at>now()
     AND approval_attempts<5
     AND confirmation_code_hash=p_confirmation_code_hash;
-  IF FOUND THEN RETURN true; END IF;
+  IF FOUND THEN
+    INSERT INTO app_private.device_enrollment_audit(request_id,event_type,actor_id)
+      VALUES(p_request_id,'APPROVED',auth.uid());
+    RETURN true;
+  END IF;
 
   UPDATE app_private.device_enrollment_requests
   SET approval_attempts=approval_attempts+1
@@ -126,6 +142,7 @@ BEGIN
      OR p_browser_secret_hash !~ '^[a-f0-9]{64}$' THEN
     RETURN;
   END IF;
+  -- Atomic claim: the actor is a trusted server, not a browser user.
   RETURN QUERY
    UPDATE app_private.device_enrollment_requests r
       SET consumed_at=now()
@@ -133,6 +150,10 @@ BEGIN
       AND r.approved_at IS NOT NULL AND r.consumed_at IS NULL
       AND r.expires_at>now()
    RETURNING r.user_id;
+  IF FOUND THEN
+    INSERT INTO app_private.device_enrollment_audit(request_id,event_type)
+      VALUES(p_request_id,'CLAIMED');
+  END IF;
 END;
 $body$;
 REVOKE ALL ON FUNCTION public.claim_approved_device_enrollment(uuid,text)
