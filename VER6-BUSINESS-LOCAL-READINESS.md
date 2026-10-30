@@ -25,6 +25,12 @@ PR #4のスキーマ契約・RLS/GRANT監査と、PR #3の診断SQL・DRAFTマ�
 
 ## 実運用前に必要な作業
 
+## 実行結果
+
+コードコミット `ae6ead7`: 実ローカルAuth22項目成功・0失敗。[PR側CI](https://github.com/oumeclinicalengineering-ai/akaden-management/actions/runs/40984851532)と[push側CI](https://github.com/oumeclinicalengineering-ai/akaden-management/actions/runs/40984843112)は両方成功し、試験ユーザー・スタック削除を含めて完了しました。既存Node動作テスト18件、静的チェック、模擬2ブラウザー共有試験も成功、失敗0件です。既存Node/静的CIのpush実行40984851534も成功しました。
+
+## 実運用前に必要な作業
+
 レビュー済み完全定義を入手し、ローカル環境にだけ適用して実JWTで上記未検証項目を確認する必要があります。本番の数量ガード未適用・過剰権限候補も別途解消が必要です。現状を実運用可能とは判断しません。
 
 ローカルのユーザーとスタックは試験終了時に削除します。Ver.5/main/本番Supabaseへの変更、本番秘密鍵の使用、有料リソース作成、公開・マージは行いません。
