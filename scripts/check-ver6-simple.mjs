@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 const s=readFileSync(new URL('../ver6-simple.html',import.meta.url),'utf8');
-for (const item of ["signInWithPassword","auth.getUser","from('profiles')","from('orders')","from('receipts')","rpc('add_receipt'","rpc('change_receipt'","rpc('cancel_receipt'","document.addEventListener('visibilitychange'","架空データ専用"]) {
+for (const item of ["signInWithPassword","auth.getUser","from('profiles')","from('orders')","fetchAll(client,'receipts')","rpc('add_receipt'","rpc('change_receipt'","rpc('cancel_receipt'","document.addEventListener('visibilitychange'","架空データ専用"]) {
  assert.ok(s.includes(item), 'Required feature missing: '+item);
 }
 assert.ok(s.includes("data-edit-order"), 'Order edit control missing');

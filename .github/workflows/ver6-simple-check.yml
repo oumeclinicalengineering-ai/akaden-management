@@ -3,8 +3,10 @@ on:
   pull_request:
     paths:
       - 'ver6-simple.html'
+      - 'ver6-preview.html'
       - 'scripts/check-ver6-simple.mjs'
       - 'scripts/test-ver6-behavior.mjs'
+      - 'scripts/test-ver6-pagination.mjs'
       - 'scripts/check-ver6-g1.mjs'
       - 'scripts/test-ver6-g1.mjs'
       - 'tests/g1-definition-inventory.json'
@@ -24,4 +26,5 @@ jobs:
           node-version: '22'
       - run: node scripts/check-ver6-simple.mjs
       - run: node scripts/test-ver6-behavior.mjs
+      - run: node scripts/test-ver6-pagination.mjs
       - run: node scripts/test-ver6-g1.mjs

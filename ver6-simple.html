@@ -29,7 +29,32 @@ async function boot(){try{const v=JSON.parse(localStorage.getItem('akaden-ver6-p
 async function enter(u){const {data,error}=await db.from('profiles').select('display_name,role,active').eq('user_id',u.id).single();if(error||!data?.active){await db.auth.signOut();throw Error('有効な利用者プロフィールを確認できません')}user=u;profile=data;$('who').textContent=data.display_name+'（'+(data.role==='admin'?'管理者':'スタッフ')+'）';$('login').classList.add('hidden');$('app').classList.remove('hidden');$('navigation').classList.remove('hidden');$('newReceipt').elements.p_person.value=data.display_name;$('newReceipt').elements.p_receipt_date.value=today();$('newOrder').elements.request_date.value=today();await load();view('ordersPanel')}
 $('signIn').onclick=async()=>{const b=$('signIn');b.disabled=true;$('loginError').textContent='';try{if(!db)init();const {data,error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error)throw error;$('password').value='';await enter(data.user)}catch(e){$('loginError').textContent=e.message}finally{b.disabled=false}};
 $('signOut').onclick=async()=>{if(db)await db.auth.signOut();note('ログアウトしました')};
-async function load(){const [a,b]=await Promise.all([db.from('orders').select('*').eq('deleted',false).order('created_at',{ascending:false}),db.from('receipts').select('*')]);if(a.error)throw a.error;if(b.error)throw b.error;orders=a.data;receipts=b.data;renderOrders()}
+const PAGE_SIZE=1000;
+let loadVersion=0;
+async function fetchAll(client,table){
+  const rows=[];let cursor=null;
+  for(;;){
+    let query=client.from(table).select('*');
+    if(table==='orders')query=query.eq('deleted',false);
+    query=query.order('id',{ascending:true}).limit(PAGE_SIZE);
+    if(cursor!==null)query=query.gt('id',cursor);
+    const {data,error}=await query;
+    if(error)throw error;
+    if(!Array.isArray(data))throw Error('データ取得結果を確認できません。更新してください');
+    for(const row of data){
+      if(typeof row.id!=='string'||(cursor!==null&&row.id<=cursor))throw Error('取得順序が変わりました。更新してください');
+      rows.push(row);cursor=row.id;
+    }
+    if(data.length<PAGE_SIZE)return rows;
+  }
+}
+async function load(){
+  const version=++loadVersion,client=db,viewer=user;
+  const [nextOrders,nextReceipts]=await Promise.all([fetchAll(client,'orders'),fetchAll(client,'receipts')]);
+  if(version!==loadVersion||client!==db||viewer!==user)return;
+  nextOrders.sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))||a.id.localeCompare(b.id));
+  orders=nextOrders;receipts=nextReceipts;renderOrders();
+}
 function renderOrders(){const rows=orders.map(o=>{const got=receipts.filter(r=>r.order_id===o.id).reduce((n,r)=>n+Number(r.quantity),0);return '<tr><td data-label="管理番号">'+safe(o.reference_no)+'</td><td data-label="品名">'+safe(o.item_name)+'</td><td data-label="発注数量">'+o.quantity+'</td><td data-label="受領済">'+got+'</td><td data-label="残数">'+Math.max(0,o.quantity-got)+'</td><td><button class="secondary small" data-open="'+safe(o.id)+'">受領・履歴</button><button class="secondary small" data-edit-order="'+safe(o.id)+'">修正</button><button class="danger small" data-cancel-order="'+safe(o.id)+'">取消</button></td></tr>'});$('ordersRows').innerHTML=rows.join('')||'<tr><td colspan="6">赤伝はありません</td></tr>';$('ordersStatus').textContent=orders.length+'件'}
 $('ordersRows').onclick=async e=>{const id=e.target.dataset.open||e.target.dataset.editOrder||e.target.dataset.cancelOrder;if(!id)return;if(e.target.dataset.open)return openOrder(id);const o=orders.find(x=>x.id===id);if(!o)return;if(e.target.dataset.cancelOrder){if(!confirm('この架空の赤伝を取消しますか？'))return;try{const {error}=await db.from('orders').update({deleted:true}).eq('id',id).select('id').single();if(error)throw error;await load();note('赤伝を取消しました',true)}catch(err){note('取消できません：'+err.message)}return}const name=prompt('品名',o.item_name);if(name===null||!name.trim())return;const got=receipts.filter(r=>r.order_id===o.id).reduce((n,r)=>n+Number(r.quantity),0);const q=prompt('発注数量（受領済 '+got+' 以上）',o.quantity);if(q===null||!/^\d+$/.test(q)||!Number.isSafeInteger(Number(q))||Number(q)<1||Number(q)>100000000||Number(q)<got)return note('発注数量は受領済数量以上にしてください（1～100000000の整数）');const orderDate=prompt('発注日（YYYY-MM-DD、空欄可）',o.order_date||'');if(orderDate===null||orderDate&&!/^\d{4}-\d{2}-\d{2}$/.test(orderDate))return note('発注日を確認してください');try{const {error}=await db.from('orders').update({item_name:name.trim(),quantity:Number(q),order_date:orderDate||null}).eq('id',id).select('id').single();if(error)throw error;await load();note('赤伝を修正しました',true)}catch(err){note('修正できません：'+err.message)}};
 function openOrder(id){selected=orders.find(o=>o.id===id);if(!selected)return;$('selectedOrder').textContent=selected.reference_no+' / '+selected.item_name;renderHistory();view('receiptPanel')}

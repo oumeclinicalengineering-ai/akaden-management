@@ -9,7 +9,7 @@ window.supabase={createClient:()=>{
  const call=async(action,args)=>{const r=await fetch('/mock',{method:'POST',body:JSON.stringify({action,args})});return r.json()};
  return {auth:{onAuthStateChange(){},getUser:async()=>({data:{user:null}}),
  signInWithPassword:async()=>({data:{user:{id:'fictional-user'}}}),signOut:async()=>({error:null})},
- from(table){const query={eq(){return query},single:()=>call('profile'),order:()=>call(table),then:(resolve,reject)=>call(table).then(resolve,reject)};return {select:()=>query,insert:o=>call('insert',o),update:o=>({eq:()=>call('update',o)})}},rpc:(name,args)=>call(name,args)};
+ from(table){const query={eq(){return query},single:()=>call('profile'),order(){return query},limit(){return query},gt(){return query},then:(resolve,reject)=>call(table).then(resolve,reject)};return {select:()=>query,insert:o=>call('insert',o),update:o=>({eq:()=>call('update',o)})}},rpc:(name,args)=>call(name,args)};
 }};
 """
 orders=[]

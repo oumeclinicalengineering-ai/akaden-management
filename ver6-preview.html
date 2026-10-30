@@ -29,7 +29,32 @@ async function boot(){try{const v=JSON.parse(localStorage.getItem('akaden-ver6-p
 async function enter(u){const {data,error}=await db.from('profiles').select('display_name,role,active').eq('user_id',u.id).single();if(error||!data?.active){await db.auth.signOut();throw Error('有効な利用者プロフィールを確認できません')}user=u;profile=data;$('who').textContent=data.display_name+'（'+(data.role==='admin'?'管理者':'スタッフ')+'）';$('login').classList.add('hidden');$('app').classList.remove('hidden');$('navigation').classList.remove('hidden');$('newReceipt').elements.p_person.value=data.display_name;$('newReceipt').elements.p_receipt_date.value=today();$('newOrder').elements.request_date.value=today();await load();view('ordersPanel')}
 $('signIn').onclick=async()=>{const b=$('signIn');b.disabled=true;$('loginError').textContent='';try{if(!db)init();const {data,error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error)throw error;$('password').value='';await enter(data.user)}catch(e){$('loginError').textContent=e.message}finally{b.disabled=false}};
 $('signOut').onclick=async()=>{if(db)await db.auth.signOut();note('ログアウトしました')};
-async function load(){const [a,b]=await Promise.all([db.from('orders').select('*').eq('deleted',false).order('created_at',{ascending:false}),db.from('receipts').select('*')]);if(a.error)throw a.error;if(b.error)throw b.error;orders=a.data;receipts=b.data;renderOrders()}
+const PAGE_SIZE=1000;
+let loadVersion=0;
+async function fetchAll(client,table){
+  const rows=[];let cursor=null;
+  for(;;){
+    let query=client.from(table).select('*');
+    if(table==='orders')query=query.eq('deleted',false);
+    query=query.order('id',{ascending:true}).limit(PAGE_SIZE);
+    if(cursor!==null)query=query.gt('id',cursor);
+    const {data,error}=await query;
+    if(error)throw error;
+    if(!Array.isArray(data))throw Error('データ取得結果を確認できません。更新してください');
+    for(const row of data){
+      if(typeof row.id!=='string'||(cursor!==null&&row.id<=cursor))throw Error('取得順序が変わりました。更新してください');
+      rows.push(row);cursor=row.id;
+    }
+    if(data.length<PAGE_SIZE)return rows;
+  }
+}
+async function load(){
+  const version=++loadVersion,client=db,viewer=user;
+  const [nextOrders,nextReceipts]=await Promise.all([fetchAll(client,'orders'),fetchAll(client,'receipts')]);
+  if(version!==loadVersion||client!==db||viewer!==user)return;
+  nextOrders.sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))||a.id.localeCompare(b.id));
+  orders=nextOrders;receipts=nextReceipts;renderOrders();
+}
 function renderOrders(){const rows=orders.map(o=>{const got=receipts.filter(r=>r.order_id===o.id).reduce((n,r)=>n+Number(r.quantity),0);return '<tr><td>'+safe(o.reference_no)+'</td><td>'+safe(o.item_name)+'</td><td>'+o.quantity+'</td><td>'+got+'</td><td>'+Math.max(0,o.quantity-got)+'</td><td><button class="secondary" data-open="'+safe(o.id)+'">受領・履歴</button></td></tr>'});$('ordersRows').innerHTML=rows.join('')||'<tr><td colspan="6">赤伝はありません</td></tr>';$('ordersStatus').textContent=orders.length+'件'}
 $('ordersRows').onclick=e=>{const id=e.target.dataset.open;if(id)openOrder(id)};
 function openOrder(id){selected=orders.find(o=>o.id===id);if(!selected)return;$('selectedOrder').textContent=selected.reference_no+' / '+selected.item_name;renderHistory();view('receiptPanel')}
