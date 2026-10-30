@@ -27,3 +27,7 @@
 6. 上記のレビュー後、既存の使い捨てローカルSupabaseへだけ適用した証拠と実JWT業務テスト。
 
 G1は未達です。追加監査の確認事項をすべて未確認扱いにはせず、部分確認として保持します。要約を復元SQLやG1合格に読み替えません。本番接続・変更は行いません。
+
+## 実行結果
+
+コードコミット `92caca6`: 動作20件・G1判定4件は成功、失敗0件。静的チェック・ローカル模擬2ブラウザー共有試験も成功。[PR側CI](https://github.com/oumeclinicalengineering-ai/akaden-management/actions/runs/40986162196)・[push側CI](https://github.com/oumeclinicalengineering-ai/akaden-management/actions/runs/40986157523)とも成功。G1チェック本体は想定どおりBLOCKED（終了コード2）であり、合格ではありません。今回の変更は台帳・テスト・文書のみです。
