@@ -2,11 +2,11 @@
   "gate": "G1",
   "items": [
     {"id":"schema","status":"summary_only","evidence":"VER6-LIVE-SCHEMA-CONTRACT-20261029.md"},
-    {"id":"rls","status":"summary_only","evidence":"VER6-RLS-GRANT-LIVE-AUDIT-20261029.md"},
+    {"id":"rls","status":"summary_only","evidence":"VER6-G1-READONLY-UPDATE-20261030.md","confirmed":["7 policies target authenticated","operation and authorization condition summaries"],"missing":["verbatim USING/WITH CHECK expressions and policy DDL","referenced authorization helper definitions"]},
     {"id":"grants","status":"summary_only","evidence":"VER6-RLS-GRANT-LIVE-AUDIT-20261029.md"},
-    {"id":"rpc","status":"summary_only","evidence":"VER6-LIVE-SCHEMA-CONTRACT-20261029.md"},
-    {"id":"triggers","status":"summary_only","evidence":"VER6-LIVE-SCHEMA-CONTRACT-20261029.md"},
-    {"id":"views","status":"missing","evidence":null},
+    {"id":"rpc","status":"summary_only","evidence":"VER6-G1-READONLY-UPDATE-20261030.md","confirmed":["three receipt signatures and return types","SECURITY DEFINER, owner postgres"],"missing":["full bodies and dependencies","complete function grants"]},
+    {"id":"triggers","status":"summary_only","evidence":"VER6-G1-READONLY-UPDATE-20261030.md","confirmed":["Auth profile creation trigger exists","orders/receipts INSERT UPDATE DELETE audit triggers exist","quantity guard absent"],"missing":["trigger DDL and function bodies"]},
+    {"id":"views","status":"summary_only","evidence":"VER6-G1-READONLY-UPDATE-20261030.md","confirmed":["order_receipt_totals exists; excludes deleted orders and aggregates quantities"],"missing":["exact SELECT and current view options/owner/grants"]},
     {"id":"local_application","status":"missing","evidence":null},
     {"id":"jwt_business_tests","status":"missing","evidence":null}
   ]

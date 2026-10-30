@@ -5,10 +5,10 @@ import test from 'node:test';
 
 const html=readFileSync(new URL('../ver6-simple.html',import.meta.url),'utf8');
 const code=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1].replace(/boot\(\);\s*$/, '');
-function setup(quantity=3, failure=null, received=3){
+function setup(quantity=3, failure=null, received=3, promptAnswers=null){
  const elements=new Map(), writes=[];
  const element=id=>{if(!elements.has(id))elements.set(id,{classList:{toggle(){},contains(){return false}},textContent:'',innerHTML:''});return elements.get(id)};
- const answers=['架空物品',String(quantity),'2026-10-29'];
+ const answers=promptAnswers??['架空物品',String(quantity),'2026-10-29'];
  const context=vm.createContext({document:{getElementById:element,addEventListener(){}},window:{scrollTo(){}},prompt:()=>answers.shift(),confirm:()=>true,console});
  vm.runInContext(code,context);
  context.mock={from:()=>({update:value=>({eq:()=>({select:()=>({single:async()=>{writes.push(value);return {data:failure?null:{id:'demo'},error:failure}}})})})})};
@@ -63,4 +63,20 @@ test('fractional receipt rejected before RPC call',async()=>{
 test('RPC permission error is visible and does not report receipt success',async()=>{
  const s=receiptSetup();s.context.mock.rpc=async()=>({error:{code:'42501',message:'mock permission denied'}});
  await s.element('newReceipt').onsubmit(s.event);assert.match(s.element('status').textContent,/受領登録できません/);
+});
+function historySetup(answers){
+ const s=setup(3,null,3,answers),calls=[];
+ s.context.mock.rpc=async(name,args)=>{calls.push({name,args});return {error:null}};
+ vm.runInContext("user={id:'fictional-staff-a'};profile={role:'staff'};selected=orders[0];receipts=[{id:'receipt',order_id:'demo',quantity:3,receipt_date:'2026-10-29',person:'架空A',memo:'',created_by:user.id}];openOrder=()=>{}",s.context);
+ return {...s,calls};
+}
+test('receipt correction sends documented change_receipt arguments',async()=>{
+ const s=historySetup(['2','2026-10-30',' 架空B ','訂正']);
+ await s.element('receiptHistory').onclick({target:{dataset:{edit:'receipt'}}});
+ assert.equal(s.calls[0].name,'change_receipt');
+ assert.deepEqual(JSON.parse(JSON.stringify(s.calls[0].args)),{p_receipt_id:'receipt',p_quantity:2,p_receipt_date:'2026-10-30',p_person:'架空B',p_memo:'訂正'});
+});
+test('receipt cancellation sends only documented receipt id',async()=>{
+ const s=historySetup([]);await s.element('receiptHistory').onclick({target:{dataset:{cancel:'receipt'}}});
+ assert.equal(s.calls[0].name,'cancel_receipt');assert.deepEqual(JSON.parse(JSON.stringify(s.calls[0].args)),{p_receipt_id:'receipt'});
 });
