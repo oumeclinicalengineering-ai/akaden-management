@@ -13,10 +13,13 @@ async function request(path,method,key,token,body){
 const users=[];
 let checks=0;
 try{
- for(let i=0;i<2;i++){
-  const email=`local-ver6-${randomUUID()}@example.invalid`,password=randomUUID()+'Aa1!';
+ // These are intended business personas only; no business role is assigned.
+ for(const persona of ['fictional-staff-a','fictional-staff-b','fictional-admin']){
+  const email=`${persona}-${randomUUID()}@example.invalid`,password=randomUUID()+'Aa1!';
   const created=await request('/admin/users','POST',admin,admin,{email,password,email_confirm:true});
   assert.ok(created.ok && created.data.id,'Local fictional user creation failed');users.push(created.data.id);
+  const wrongPassword=await request('/token?grant_type=password','POST',anon,anon,{email,password:randomUUID()});
+  assert.equal(wrongPassword.ok,false,'Wrong password was accepted');checks++;
   const login=await request('/token?grant_type=password','POST',anon,anon,{email,password});
   assert.ok(login.ok && login.data.user?.id===created.data.id && login.data.refresh_token,'Password login failed');checks++;
   // Serialized session is kept in memory only; no tokens written to files/logs.
@@ -25,13 +28,15 @@ try{
   assert.ok(restored.ok && restored.data.id===created.data.id,'Saved access session restoration failed');checks++;
   const refreshed=await request('/token?grant_type=refresh_token','POST',anon,anon,{refresh_token:saved.refresh_token});
   assert.ok(refreshed.ok && refreshed.data.user?.id===created.data.id,'Refresh session restoration failed');checks++;
+  const refreshedUser=await request('/user','GET',anon,refreshed.data.access_token);
+  assert.ok(refreshedUser.ok && refreshedUser.data.id===created.data.id,'Refreshed access token identity mismatch');checks++;
   const logout=await request('/logout?scope=global','POST',anon,refreshed.data.access_token);
   assert.ok(logout.ok,'Logout failed');checks++;
   const revoked=await request('/token?grant_type=refresh_token','POST',anon,anon,{refresh_token:refreshed.data.refresh_token});
   assert.equal(revoked.ok,false,'Refresh session survived logout');checks++;
  }
- assert.notEqual(users[0],users[1],'Two users must be independent');checks++;
- console.log(`PASS: ${checks} local Auth checks, two fictional users; no business RLS/RPC tested`);
+ assert.equal(new Set(users).size,3,'Three users must be independent');checks++;
+ console.log(`PASS: ${checks} local Auth checks, three fictional users; no business roles/RLS/RPC tested`);
 }finally{
  for(const id of users){const removed=await request('/admin/users/'+id,'DELETE',admin,admin);assert.ok(removed.ok,'Local user cleanup failed')}
 }
