@@ -5,6 +5,9 @@ on:
       - 'ver6-simple.html'
       - 'scripts/check-ver6-simple.mjs'
       - 'scripts/test-ver6-behavior.mjs'
+      - 'scripts/check-ver6-g1.mjs'
+      - 'scripts/test-ver6-g1.mjs'
+      - 'tests/g1-definition-inventory.json'
       - '.github/workflows/ver6-simple-check.yml'
   push:
     branches:
@@ -21,3 +24,4 @@ jobs:
           node-version: '22'
       - run: node scripts/check-ver6-simple.mjs
       - run: node scripts/test-ver6-behavior.mjs
+      - run: node scripts/test-ver6-g1.mjs

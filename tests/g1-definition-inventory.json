@@ -1,0 +1,13 @@
+{
+  "gate": "G1",
+  "items": [
+    {"id":"schema","status":"summary_only","evidence":"VER6-LIVE-SCHEMA-CONTRACT-20261029.md"},
+    {"id":"rls","status":"summary_only","evidence":"VER6-RLS-GRANT-LIVE-AUDIT-20261029.md"},
+    {"id":"grants","status":"summary_only","evidence":"VER6-RLS-GRANT-LIVE-AUDIT-20261029.md"},
+    {"id":"rpc","status":"summary_only","evidence":"VER6-LIVE-SCHEMA-CONTRACT-20261029.md"},
+    {"id":"triggers","status":"summary_only","evidence":"VER6-LIVE-SCHEMA-CONTRACT-20261029.md"},
+    {"id":"views","status":"missing","evidence":null},
+    {"id":"local_application","status":"missing","evidence":null},
+    {"id":"jwt_business_tests","status":"missing","evidence":null}
+  ]
+}
