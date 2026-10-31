@@ -1,0 +1,49 @@
+name: Ver6 disposable local Auth lifecycle
+on:
+  push:
+    branches: [feature/ver6-simple-core-20261029]
+    paths: ['scripts/test-ver6-local-auth.mjs', '.github/workflows/ver6-local-auth-test.yml']
+  pull_request:
+    paths: ['scripts/test-ver6-local-auth.mjs', '.github/workflows/ver6-local-auth-test.yml']
+permissions:
+  contents: read
+jobs:
+  local-auth:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      SUPABASE_ACCESS_TOKEN: ''
+      SUPABASE_DB_PASSWORD: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Start disposable local Supabase only
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/akaden-core-auth"
+          npx --yes supabase@2.122.0 --workdir "$RUNNER_TEMP/akaden-core-auth" init --yes
+          if ! npx --yes supabase@2.122.0 --workdir "$RUNNER_TEMP/akaden-core-auth" start --exclude studio,postgres-meta,realtime,storage-api,imgproxy,edge-runtime,logflare,vector,supavisor > "$RUNNER_TEMP/akaden-core-start.log" 2>&1; then
+            echo 'Local Auth startup failed; credential-bearing logs withheld.'
+            exit 1
+          fi
+      - name: Load local-only ephemeral connection settings
+        run: |
+          set -eu
+          npx --yes supabase@2.122.0 --workdir "$RUNNER_TEMP/akaden-core-auth" status -o env > "$RUNNER_TEMP/akaden-core-status.env"
+          for pair in "API_URL LOCAL_API_URL" "ANON_KEY LOCAL_ANON_KEY" "SERVICE_ROLE_KEY LOCAL_SERVICE_ROLE_KEY"; do
+            set -- $pair
+            value="$(grep -m1 "^$1=" "$RUNNER_TEMP/akaden-core-status.env" | cut -d= -f2- | tr -d '"')"
+            test -n "$value"
+            printf '::add-mask::%s\n' "$value"
+            printf '%s=%s\n' "$2" "$value" >> "$GITHUB_ENV"
+          done
+          rm -f "$RUNNER_TEMP/akaden-core-status.env"
+      - name: Test two users against real local Auth
+        run: node scripts/test-ver6-local-auth.mjs
+      - name: Destroy local stack even on failure
+        if: always()
+        run: |
+          npx --yes supabase@2.122.0 --workdir "$RUNNER_TEMP/akaden-core-auth" stop --no-backup
+          rm -f "$RUNNER_TEMP/akaden-core-start.log" "$RUNNER_TEMP/akaden-core-status.env"

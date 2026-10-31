@@ -1,0 +1,30 @@
+name: Ver6 simple static check
+on:
+  pull_request:
+    paths:
+      - 'ver6-simple.html'
+      - 'ver6-preview.html'
+      - 'scripts/check-ver6-simple.mjs'
+      - 'scripts/test-ver6-behavior.mjs'
+      - 'scripts/test-ver6-pagination.mjs'
+      - 'scripts/check-ver6-g1.mjs'
+      - 'scripts/test-ver6-g1.mjs'
+      - 'tests/g1-definition-inventory.json'
+      - '.github/workflows/ver6-simple-check.yml'
+  push:
+    branches:
+      - feature/ver6-simple-core-20261029
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/check-ver6-simple.mjs
+      - run: node scripts/test-ver6-behavior.mjs
+      - run: node scripts/test-ver6-pagination.mjs
+      - run: node scripts/test-ver6-g1.mjs
