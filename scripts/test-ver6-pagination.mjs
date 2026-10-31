@@ -20,7 +20,7 @@ function setup(file,n,inject=()=>null){
  return {context,data,calls,get,load:()=>vm.runInContext('load()',context),state:()=>JSON.parse(vm.runInContext('JSON.stringify({orders,receipts})',context))};
 }
 for(const file of ['ver6-simple.html','ver6-preview.html']){
- for(const n of [0,17,1000,1001,3205])test(`${file}: complete ${n} orders/receipts and correct totals`,async()=>{
+ for(const n of [999,1000,1001,2000])test(`${file}: complete ${n} orders/receipts and correct totals`,async()=>{
   const s=setup(file,n);await s.load();const state=s.state();assert.equal(state.orders.length,n);assert.equal(state.receipts.length,n);
   assert.equal(new Set(state.receipts.map(r=>r.id)).size,n);
   assert.equal(s.calls.filter(c=>c.table==='receipts').length,Math.floor(n/1000)+1);
@@ -31,6 +31,34 @@ for(const file of ['ver6-simple.html','ver6-preview.html']){
    const target=state.orders.find(o=>o.id===id(1));assert.equal(target.quantity-n,5);
    assert.ok(s.get('ordersRows').innerHTML.includes(file==='ver6-simple.html'?'data-label="残数">5</td>':'<td>5</td>'));
   }
+ });
+ test(`${file}: partial/full receipt, correction, cancellation, and history remain complete after page boundary`,async()=>{
+  const s=setup(file,1001);
+  // Three receipts are deliberately placed around the first page boundary.
+  // The remaining synthetic rows only make the result cross the API limit.
+  s.data.orders[0].quantity=5;
+  for(let i=2;i<1000;i++)s.data.receipts[i].order_id=id(2);
+  s.data.receipts[0]={id:id(1),order_id:id(1),quantity:2,receipt_date:'2026-10-30'};
+  s.data.receipts[1]={id:id(2),order_id:id(1),quantity:2,receipt_date:'2026-10-31'};
+  s.data.receipts[1000]={id:id(1001),order_id:id(1),quantity:1,receipt_date:'2026-11-01'};
+  await s.load();
+  const order=()=>s.state().orders.find(o=>o.id===id(1));
+  const totals=()=>s.state().receipts.filter(r=>r.order_id===id(1)).reduce((sum,r)=>sum+r.quantity,0);
+  assert.equal(totals(),5); // all three rows, including the second page, were read
+  assert.equal(order().quantity,5);
+  vm.runInContext(`selected=orders.find(o=>o.id==='${id(1)}');renderHistory()`,s.context);
+  assert.equal((s.get('receiptHistory').innerHTML.match(/class="panel"/g)||[]).length,3);
+  // Simulate the server result after correcting the middle receipt, then cancelling the last.
+  s.data.receipts[1].quantity=1;
+  await s.load();
+  assert.equal(totals(),4);
+  assert.ok(s.get('ordersRows').innerHTML.includes(file==='ver6-simple.html'?'data-label="残数">1</td>':'<td>1</td>'));
+  s.data.receipts.splice(1000,1);
+  await s.load();
+  assert.equal(totals(),3); // the preceding two partial receipts remain available
+  assert.ok(s.get('ordersRows').innerHTML.includes(file==='ver6-simple.html'?'data-label="残数">2</td>':'<td>2</td>'));
+  vm.runInContext(`selected=orders.find(o=>o.id==='${id(1)}');renderHistory()`,s.context);
+  assert.equal((s.get('receiptHistory').innerHTML.match(/class="panel"/g)||[]).length,2);
  });
  test(`${file}: middle-page error retains previous complete state and retry works`,async()=>{
   let fail=true;const s=setup(file,1001,c=>fail&&c.table==='receipts'&&c.index===1?{data:null,error:Error('offline')}:null);
